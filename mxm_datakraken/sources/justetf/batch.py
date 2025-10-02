@@ -28,8 +28,8 @@ from typing import Optional
 
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
+from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
 from mxm_datakraken.sources.justetf.profiles.parser import (
-    ETFProfileParsed,
     parse_profile,
 )
 from mxm_datakraken.sources.justetf.profiles.persistence import (
@@ -84,7 +84,7 @@ def run_batch(
     profiles_dir.mkdir(parents=True, exist_ok=True)
 
     # Profiles parsed during this run (used to build the snapshot)
-    run_profiles: list[ETFProfileParsed] = []
+    run_profiles: list[JustETFProfile] = []
 
     # 3) Process each index entry
     for entry in index_entries:
@@ -99,7 +99,7 @@ def run_batch(
 
         try:
             html = download_etf_profile_html(isin, url)
-            parsed: ETFProfileParsed = parse_profile(html, isin)
+            parsed: JustETFProfile = parse_profile(html, isin)
             parsed["source_url"] = url  # provenance
             save_profile(parsed, profiles_dir)
 

@@ -1,111 +1,166 @@
 """
-mxm_datakraken.sources.justetf.profiles.parser
+HTML parser for JustETF profile pages.
 
-Robust parsing of a single justETF profile HTML page.
+This module extracts data from a single ETF profile page, returning a
+JustETFProfile structure faithful to the JustETF site’s layout.
 
-We extract:
-- name (from: h1#etf-title)
-- description (from: #etf-description-content; fallback to #etf-description)
-- data table under the "Basics" / "Data" section (h3 == "Data" → table.etf-data-table)
-
-Notes on HTML structure (from the sample fixture):
-- Labels are in <td class="vallabel">; the value cell is the last <td> in the row and
-  can contain nested spans/divs. We flatten its text with single spaces.
-- Some fields we care about include "Index", "Total expense ratio", "Fund Provider".
+Helpers (`extract_name`, `extract_description`, `extract_data_table`,
+`extract_listings`) are factored out for granular testing.
 """
 
 from __future__ import annotations
 
-from typing import Dict, TypedDict
+import re
+from datetime import datetime, timezone
 
-from bs4 import BeautifulSoup  # type: ignore[reportMissingTypeStubs]
+from bs4 import BeautifulSoup, Tag
 
-
-class ETFProfileParsed(TypedDict, total=False):
-    isin: str
-    name: str
-    description: str
-    data: Dict[str, str]
-    # Future-friendly: identifiers like WKN / Ticker could be added later:
-    # identifiers: Dict[str, str]
+from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
 
 
-def _norm_text(s: str) -> str:
-    """Normalize whitespace: collapse inner whitespace and strip ends."""
-    return " ".join(s.split()).strip()
-
-
-def parse_profile(html: str, isin: str) -> ETFProfileParsed:
+def parse_profile(
+    html: str, isin: str, source_url: str | None = None
+) -> JustETFProfile:
     """
-    Parse a justETF profile HTML into a structured dict.
+    Parse a JustETF profile HTML page into a structured dict.
 
     Args:
-        html: Raw HTML of the profile page.
-        isin: ISIN we expect for this profile (used as authoritative ID).
+        html: Raw HTML of the ETF profile page.
+        isin: ISIN of the ETF (from sitemap / index).
+        source_url: Optional canonical profile URL (for provenance).
 
     Returns:
-        A dict with keys: 'isin', 'name', 'description', 'data'.
-
-    Raises:
-        ValueError: if we cannot find a valid title/name.
+        A JustETFProfile dictionary with parsed fields.
     """
-    # BeautifulSoup's types are dynamically typed; suppress strict type noise locally.
-    soup = BeautifulSoup(html, "html.parser")  # type: ignore[no-untyped-call]
+    soup = BeautifulSoup(html, "html.parser")
 
-    # --- Name (required) ---
-    name_el = soup.select_one("#etf-title")  # type: ignore[no-untyped-call]
-    if name_el is None or name_el.get_text(strip=True) == "":
-        raise ValueError("Could not locate ETF title (#etf-title)")
-    name = name_el.get_text(strip=True)
+    name = extract_name(soup)
+    description = extract_description(soup)
+    data = extract_data_table(soup)
+    listings = extract_listings(soup)
 
-    # --- Description (best source first, with fallback) ---
-    desc_el = soup.select_one("#etf-description-content")  # type: ignore[no-untyped-call]
-    if desc_el is None:
-        desc_el = soup.select_one("#etf-description")  # type: ignore[no-untyped-call]
-    description = ""
-    if desc_el is not None:
-        # Keep sentences together but normalize whitespace.
-        description = _norm_text(desc_el.get_text(separator=" "))  # type: ignore[no-untyped-call]
-
-    # --- Data table under Basics → "Data" ---
-    data: Dict[str, str] = {}
-
-    # Find the specific "Data" heading first (h3 whose text equals "Data")
-    data_h = soup.find(  # type: ignore[no-untyped-call]
-        ["h2", "h3"],
-        string=lambda t: isinstance(t, str) and t.strip().lower() == "data",
-    )
-    table = None
-    if data_h is not None:
-        table = data_h.find_next("table", class_="etf-data-table")  # type: ignore[no-untyped-call]
-
-    # Fallback: first table with the known class if heading heuristic fails
-    if table is None:
-        table = soup.find("table", class_="etf-data-table")  # type: ignore[no-untyped-call]
-
-    if table is not None:
-        for row in table.find_all("tr"):  # type: ignore[no-untyped-call]
-            cells = row.find_all("td")  # type: ignore[no-untyped-call]
-            if len(cells) < 2:
-                continue
-            # Label: prefer .vallabel cell if present
-            label_el = row.find("td", class_="vallabel")  # type: ignore[no-untyped-call]
-            label = (
-                label_el.get_text(strip=True)
-                if label_el is not None
-                else cells[0].get_text(strip=True)
-            )
-            if not label:
-                continue
-            # Value: last cell, flatten text with single spaces
-            val_raw = cells[-1].get_text(separator=" ", strip=True)
-            val = _norm_text(val_raw)
-            data[label] = val
-
-    parsed: ETFProfileParsed = {
+    profile: JustETFProfile = {
         "isin": isin,
         "name": name,
         "description": description,
         "data": data,
+        "listings": listings,
+        "source_url": source_url or "",
+        "last_fetched": datetime.now(timezone.utc).isoformat(),
     }
-    return parsed
+
+    return profile
+
+
+# ----------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------
+
+
+def extract_name(soup: BeautifulSoup) -> str:
+    """Extract the ETF name from the <h1> header."""
+    name_el: Tag | None = soup.find("h1")
+    return name_el.get_text(strip=True) if name_el else ""
+
+
+def extract_description(soup: BeautifulSoup) -> str:
+    """
+    Extracts the fund description text from the profile page.
+
+    Args:
+        soup: BeautifulSoup-parsed HTML.
+
+    Returns:
+        A cleaned string containing the description.
+    """
+    desc_container = soup.find("div", id="etf-description-content")
+    if not desc_container:
+        return ""
+
+    # Collect text fragments while skipping separators
+    parts: list[str] = []
+    for child in desc_container.find_all("div", recursive=False):
+        text = child.get_text(" ", strip=True)
+        if text:
+            parts.append(text)
+
+    raw = " ".join(parts)
+
+    # Normalize whitespace
+    cleaned = re.sub(r"\s+", " ", raw)
+
+    # Remove spaces before punctuation like ". , ; :"
+    cleaned = re.sub(r"\s+([.,;:])", r"\1", cleaned)
+
+    return cleaned.strip()
+
+
+def extract_data_table(soup: BeautifulSoup) -> dict[str, str]:
+    """
+    Extract key-value pairs from the ETF data table.
+    Keys are in <td class="vallabel">, values in <td>/<div>/<span> with
+    class val/val2 or plain text.
+    """
+    data: dict[str, str] = {}
+
+    table = soup.find("table", class_="etf-data-table")
+    if not table:
+        return data
+
+    for row in table.find_all("tr"):
+        label_cell = row.find("td", class_="vallabel")
+        value_cell = None
+        if label_cell:
+            # find the sibling cell (second <td>)
+            siblings = row.find_all("td")
+            if len(siblings) > 1:
+                value_cell = siblings[1]
+
+        if not label_cell or not value_cell:
+            continue
+
+        key = label_cell.get_text(" ", strip=True)
+
+        # values may be nested in <div class="val">, <span class="val2">, etc.
+        vals = []
+        for cls in ["val", "val2"]:
+            for el in value_cell.find_all(class_=cls):
+                vals.append(el.get_text(" ", strip=True))
+
+        # fallback: if no val/val2, take raw text
+        if not vals:
+            vals.append(value_cell.get_text(" ", strip=True))
+
+        value = " ".join(v for v in vals if v)
+        data[key] = value
+
+    return data
+
+
+def extract_listings(soup: BeautifulSoup) -> list[dict[str, str]]:
+    listings: list[dict[str, str]] = []
+    table = soup.find("table", class_="mobile-table")
+    if not table:
+        return listings
+
+    headers = [
+        th.get_text(" ", strip=True) for th in table.find("thead").find_all("th")
+    ]
+
+    for row in table.find("tbody").find_all("tr"):
+        cells = row.find_all("td")
+        if len(cells) != len(headers):
+            continue
+
+        row_dict: dict[str, str] = {}
+        for i, cell in enumerate(cells):
+            parts = [
+                t.strip()
+                for t in cell.stripped_strings
+                if t.strip() and t.strip() != "-"
+            ]
+            text = " ".join(parts)
+            row_dict[headers[i]] = text
+        listings.append(row_dict)
+
+    return listings

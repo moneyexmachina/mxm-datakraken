@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from mxm_datakraken.sources.justetf.profiles.parser import ETFProfileParsed
+from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
 from mxm_datakraken.sources.justetf.profiles.persistence import (
     save_profile,
     save_profiles_snapshot,
@@ -14,7 +14,7 @@ from mxm_datakraken.sources.justetf.profiles.persistence import (
 
 
 @pytest.fixture
-def sample_profile() -> ETFProfileParsed:
+def sample_profile() -> JustETFProfile:
     return {
         "isin": "TEST123",
         "name": "Test ETF",
