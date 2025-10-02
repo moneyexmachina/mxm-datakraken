@@ -1,3 +1,7 @@
+"""
+Tests for building the ETF Profile Index from the justETF sitemap.
+"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -5,9 +9,9 @@ from typing import Any
 
 import pytest
 
-from mxm_datakraken.sources.justetf.discovery.discover import (
-    ETFProfile,
-    discover_etf_profiles,
+from mxm_datakraken.sources.justetf.profile_index.discover import (
+    ETFProfileIndexEntry,
+    build_profile_index,
 )
 
 
@@ -21,8 +25,8 @@ class DummyResp:
         return None
 
 
-def test_discover_from_sample(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure discovery works correctly on a sample sitemap fixture."""
+def test_build_profile_index_from_sample(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure build_profile_index works correctly on a sample sitemap fixture."""
 
     # Load local XML fixture
     sample_path: Path = Path(__file__).parent.parent / "data" / "sample_sitemap.xml"
@@ -33,16 +37,17 @@ def test_discover_from_sample(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Monkeypatch requests.get to return our dummy response
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.discovery.discover.requests.get", fake_get
+        "mxm_datakraken.sources.justetf.profile_index.discover.requests.get",
+        fake_get,
     )
 
-    profiles: list[ETFProfile] = discover_etf_profiles("dummy-url")
+    index: list[ETFProfileIndexEntry] = build_profile_index("dummy-url")
 
     # Expect exactly 3 ISINs from the sample fixture
-    assert len(profiles) == 3
-    isins: set[str] = {p["isin"] for p in profiles}
+    assert len(index) == 3
+    isins: set[str] = {entry["isin"] for entry in index}
     assert isins == {"BG9000011163", "BGCROEX03189", "BGCZPX003174"}
 
     # Ensure all canonical URLs are English (/en/)
-    for profile in profiles:
-        assert "/en/" in profile["url"]
+    for entry in index:
+        assert "/en/" in entry["url"]

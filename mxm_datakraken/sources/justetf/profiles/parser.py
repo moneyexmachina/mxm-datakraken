@@ -1,79 +1,111 @@
 """
-Parser for justETF profile pages.
+mxm_datakraken.sources.justetf.profiles.parser
+
+Robust parsing of a single justETF profile HTML page.
+
+We extract:
+- name (from: h1#etf-title)
+- description (from: #etf-description-content; fallback to #etf-description)
+- data table under the "Basics" / "Data" section (h3 == "Data" → table.etf-data-table)
+
+Notes on HTML structure (from the sample fixture):
+- Labels are in <td class="vallabel">; the value cell is the last <td> in the row and
+  can contain nested spans/divs. We flatten its text with single spaces.
+- Some fields we care about include "Index", "Total expense ratio", "Fund Provider".
 """
 
 from __future__ import annotations
 
-from typing import Optional, TypedDict
+from typing import Dict, TypedDict
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup  # type: ignore[reportMissingTypeStubs]
 
 
-class ETFProfileParsed(TypedDict):
+class ETFProfileParsed(TypedDict, total=False):
     isin: str
-    name: Optional[str]
-    data: dict[str, str]
-    description: Optional[str]
+    name: str
+    description: str
+    data: Dict[str, str]
+    # Future-friendly: identifiers like WKN / Ticker could be added later:
+    # identifiers: Dict[str, str]
 
 
-def _get_text_safe(tag: Optional[Tag]) -> Optional[str]:
-    """Extract text from a BeautifulSoup Tag, or None if tag is None/empty."""
-    if tag is None:
-        return None
-    text: str = tag.get_text(strip=True)
-    return text if text else None
+def _norm_text(s: str) -> str:
+    """Normalize whitespace: collapse inner whitespace and strip ends."""
+    return " ".join(s.split()).strip()
 
 
 def parse_profile(html: str, isin: str) -> ETFProfileParsed:
     """
-    Parse a justETF ETF profile page into structured data.
+    Parse a justETF profile HTML into a structured dict.
 
     Args:
-        html: Raw HTML content of the profile page.
-        isin: ISIN of the ETF (used as identity key).
+        html: Raw HTML of the profile page.
+        isin: ISIN we expect for this profile (used as authoritative ID).
 
     Returns:
-        Parsed ETF profile with keys:
-            - isin
-            - name
-            - data (dict of 'Data' section key/values)
-            - description
+        A dict with keys: 'isin', 'name', 'description', 'data'.
+
+    Raises:
+        ValueError: if we cannot find a valid title/name.
     """
-    soup: BeautifulSoup = BeautifulSoup(html, "html.parser")
+    # BeautifulSoup's types are dynamically typed; suppress strict type noise locally.
+    soup = BeautifulSoup(html, "html.parser")  # type: ignore[no-untyped-call]
 
-    # --- Name ---
-    title_el = soup.find("h1", id="etf-title") or soup.find("h1")
-    name: Optional[str] = _get_text_safe(title_el)
+    # --- Name (required) ---
+    name_el = soup.select_one("#etf-title")  # type: ignore[no-untyped-call]
+    if name_el is None or name_el.get_text(strip=True) == "":
+        raise ValueError("Could not locate ETF title (#etf-title)")
+    name = name_el.get_text(strip=True)
 
-    # --- Data section ---
-    data: dict[str, str] = {}
-    heading_tag: Optional[Tag] = soup.find(  # type: ignore
+    # --- Description (best source first, with fallback) ---
+    desc_el = soup.select_one("#etf-description-content")  # type: ignore[no-untyped-call]
+    if desc_el is None:
+        desc_el = soup.select_one("#etf-description")  # type: ignore[no-untyped-call]
+    description = ""
+    if desc_el is not None:
+        # Keep sentences together but normalize whitespace.
+        description = _norm_text(desc_el.get_text(separator=" "))  # type: ignore[no-untyped-call]
+
+    # --- Data table under Basics → "Data" ---
+    data: Dict[str, str] = {}
+
+    # Find the specific "Data" heading first (h3 whose text equals "Data")
+    data_h = soup.find(  # type: ignore[no-untyped-call]
         ["h2", "h3"],
-        string=lambda t: isinstance(t, str) and "Data" in t,  # type: ignore
+        string=lambda t: isinstance(t, str) and t.strip().lower() == "data",
     )
-    if heading_tag is not None:
-        table_tag: Optional[Tag] = heading_tag.find_next("table")  # type: ignore
-        if table_tag is not None:
-            for row in table_tag.find_all("tr"):  #  type: ignore
-                cells: list[Tag] = row.find_all("td")  # type: ignore
-                if len(cells) == 2:  # type: ignore
-                    label: str = cells[0].get_text(strip=True)  # type: ignore
-                    value: str = cells[1].get_text(strip=True)  # type: ignore
-                    data[label] = value
+    table = None
+    if data_h is not None:
+        table = data_h.find_next("table", class_="etf-data-table")  # type: ignore[no-untyped-call]
 
-    # --- Description section ---
-    description: Optional[str] = None
-    desc_heading: Optional[Tag] = soup.find(  # type: ignore
-        ["h2", "h3"],
-        string=lambda t: isinstance(t, str) and "Description" in t,  # type: ignore
-    )
-    if desc_heading is not None:
-        desc_div: Optional[Tag] = desc_heading.find_next("div")  # type: ignore
-        description = _get_text_safe(desc_div)  # type: ignore
+    # Fallback: first table with the known class if heading heuristic fails
+    if table is None:
+        table = soup.find("table", class_="etf-data-table")  # type: ignore[no-untyped-call]
 
-    return {
+    if table is not None:
+        for row in table.find_all("tr"):  # type: ignore[no-untyped-call]
+            cells = row.find_all("td")  # type: ignore[no-untyped-call]
+            if len(cells) < 2:
+                continue
+            # Label: prefer .vallabel cell if present
+            label_el = row.find("td", class_="vallabel")  # type: ignore[no-untyped-call]
+            label = (
+                label_el.get_text(strip=True)
+                if label_el is not None
+                else cells[0].get_text(strip=True)
+            )
+            if not label:
+                continue
+            # Value: last cell, flatten text with single spaces
+            val_raw = cells[-1].get_text(separator=" ", strip=True)
+            val = _norm_text(val_raw)
+            data[label] = val
+
+    parsed: ETFProfileParsed = {
         "isin": isin,
         "name": name,
-        "data": data,
         "description": description,
+        "data": data,
     }
+    return parsed

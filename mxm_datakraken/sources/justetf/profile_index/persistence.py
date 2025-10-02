@@ -1,5 +1,5 @@
 """
-Persistence helpers for ETF profile discovery.
+Persistence helpers for the ETF Profile Index.
 """
 
 from __future__ import annotations
@@ -9,21 +9,23 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Sequence
 
-from mxm_datakraken.sources.justetf.discovery.discover import ETFProfile
+from mxm_datakraken.sources.justetf.profile_index.discover import (
+    ETFProfileIndexEntry,
+)
 
 
-def save_discovery_results(
-    profiles: Sequence[ETFProfile],
+def save_profile_index(
+    index: Sequence[ETFProfileIndexEntry],
     base_path: Path,
     as_of: date | None = None,
     write_latest: bool = True,
 ) -> Path:
     """
-    Save ETF profile discovery results to disk.
+    Save an ETF Profile Index snapshot to disk.
 
     Args:
-        profiles: Sequence of ETFProfile dicts to save.
-        base_path: Root folder where discovery files are stored.
+        index: Sequence of ETFProfileIndexEntry dicts to save.
+        base_path: Root folder where profile_index files are stored.
         as_of: Optional date for the snapshot. Defaults to today.
         write_latest: Whether to also write/update a 'latest.json'.
 
@@ -33,58 +35,58 @@ def save_discovery_results(
     as_of = as_of or date.today()
 
     # Ensure directory exists
-    discovery_dir = base_path / "discovery"
-    discovery_dir.mkdir(parents=True, exist_ok=True)
+    index_dir = base_path / "profile_index"
+    index_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"discovery_{as_of.isoformat()}.json"
-    filepath = discovery_dir / filename
+    filename = f"profile_index_{as_of.isoformat()}.json"
+    filepath = index_dir / filename
 
     with filepath.open("w", encoding="utf-8") as f:
-        json.dump(profiles, f, ensure_ascii=False, indent=2)
+        json.dump(index, f, ensure_ascii=False, indent=2)
 
     if write_latest:
-        latest_path = discovery_dir / "latest.json"
+        latest_path = index_dir / "latest.json"
         with latest_path.open("w", encoding="utf-8") as f:
-            json.dump(profiles, f, ensure_ascii=False, indent=2)
+            json.dump(index, f, ensure_ascii=False, indent=2)
 
     return filepath
 
 
-def load_discovery_results(
+def load_profile_index(
     base_path: Path, as_of: date | None = None
-) -> list[ETFProfile]:
+) -> list[ETFProfileIndexEntry]:
     """
-    Load ETF profile discovery results from disk.
+    Load an ETF Profile Index snapshot from disk.
 
     Args:
-        base_path: Root folder where discovery files are stored.
+        base_path: Root folder where profile_index files are stored.
         as_of: Optional date. If None, load 'latest.json'.
                If provided, load the most recent snapshot <= as_of.
 
     Returns:
-        A list of ETFProfile dicts.
+        A list of ETFProfileIndexEntry dicts.
 
     Raises:
         FileNotFoundError: If no matching snapshot is found.
-        ValueError: If discovery directory is missing or empty.
+        ValueError: If profile_index directory is missing or empty.
     """
-    discovery_dir = base_path / "discovery"
-    if not discovery_dir.exists():
-        raise ValueError(f"Discovery directory not found: {discovery_dir}")
+    index_dir = base_path / "profile_index"
+    if not index_dir.exists():
+        raise ValueError(f"Profile index directory not found: {index_dir}")
 
     if as_of is None:
-        latest_path = discovery_dir / "latest.json"
+        latest_path = index_dir / "latest.json"
         if not latest_path.exists():
-            raise FileNotFoundError(f"No latest.json found in {discovery_dir}")
+            raise FileNotFoundError(f"No latest.json found in {index_dir}")
         return json.loads(latest_path.read_text(encoding="utf-8"))
 
     # Gather all dated snapshots
     snapshots: list[tuple[date, Path]] = []
-    for file in discovery_dir.glob("discovery_*.json"):
-        stem = file.stem  # e.g. "discovery_2025-10-01"
+    for file in index_dir.glob("profile_index_*.json"):
+        stem = file.stem  # e.g. "profile_index_2025-10-01"
         try:
             snap_date = datetime.strptime(
-                stem.replace("discovery_", ""), "%Y-%m-%d"
+                stem.replace("profile_index_", ""), "%Y-%m-%d"
             ).date()
         except ValueError:
             continue
@@ -93,7 +95,7 @@ def load_discovery_results(
 
     if not snapshots:
         raise FileNotFoundError(
-            f"No discovery snapshot found on or before {as_of.isoformat()}"
+            f"No profile index snapshot found on or before {as_of.isoformat()}"
         )
 
     # Pick the latest snapshot <= as_of
