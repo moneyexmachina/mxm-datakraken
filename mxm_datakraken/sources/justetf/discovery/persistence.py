@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Sequence
 
-from mxm_datakraken.sources.justetf.discover import ETFProfile
+from mxm_datakraken.sources.justetf.discovery.discover import ETFProfile
 
 
 def save_discovery_results(

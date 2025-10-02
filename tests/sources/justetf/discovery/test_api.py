@@ -6,8 +6,8 @@ from typing import Any
 
 import pytest
 
-from mxm_datakraken.sources.justetf.api import get_profiles
-from mxm_datakraken.sources.justetf.discover import ETFProfile
+from mxm_datakraken.sources.justetf.discovery.api import get_profiles
+from mxm_datakraken.sources.justetf.discovery.discover import ETFProfile
 
 
 @pytest.fixture
@@ -30,7 +30,8 @@ def test_get_profiles_first_run(
         return fake_profiles
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.api.discover_etf_profiles", fake_discover
+        "mxm_datakraken.sources.justetf.discovery.api.discover_etf_profiles",
+        fake_discover,
     )
 
     results: list[ETFProfile] = get_profiles(tmp_path)
@@ -53,7 +54,8 @@ def test_get_profiles_force_refresh(
         return fake_profiles
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.api.discover_etf_profiles", fake_discover
+        "mxm_datakraken.sources.justetf.discovery.api.discover_etf_profiles",
+        fake_discover,
     )
 
     # Call twice with force_refresh=True
@@ -72,11 +74,14 @@ def test_get_profiles_as_of(
         return fake_profiles
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.api.discover_etf_profiles", fake_discover
+        "mxm_datakraken.sources.justetf.discovery.api.discover_etf_profiles",
+        fake_discover,
     )
 
     # Save two snapshots manually
-    from mxm_datakraken.sources.justetf.persistence import save_discovery_results
+    from mxm_datakraken.sources.justetf.discovery.persistence import (
+        save_discovery_results,
+    )
 
     save_discovery_results(fake_profiles, tmp_path, as_of=date(2025, 9, 30))
     save_discovery_results(fake_profiles, tmp_path, as_of=date(2025, 10, 5))

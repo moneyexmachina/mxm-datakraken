@@ -10,8 +10,11 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from mxm_datakraken.sources.justetf.discover import ETFProfile, discover_etf_profiles
-from mxm_datakraken.sources.justetf.persistence import (
+from mxm_datakraken.sources.justetf.discovery.discover import (
+    ETFProfile,
+    discover_etf_profiles,
+)
+from mxm_datakraken.sources.justetf.discovery.persistence import (
     load_discovery_results,
     save_discovery_results,
 )

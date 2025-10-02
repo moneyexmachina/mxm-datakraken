@@ -1,5 +1,5 @@
 """
-mxm-datakraken.sources.justetf.discover
+mxm-datakraken.sources.justetf.discovery.discover
 
 Discovery of ETF profile pages from the justETF sitemap.
 

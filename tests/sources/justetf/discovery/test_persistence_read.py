@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from mxm_datakraken.sources.justetf.discover import ETFProfile
-from mxm_datakraken.sources.justetf.persistence import (
+from mxm_datakraken.sources.justetf.discovery.discover import ETFProfile
+from mxm_datakraken.sources.justetf.discovery.persistence import (
     load_discovery_results,
     save_discovery_results,
 )

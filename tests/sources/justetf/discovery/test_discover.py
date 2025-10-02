@@ -5,7 +5,10 @@ from typing import Any
 
 import pytest
 
-from mxm_datakraken.sources.justetf.discover import ETFProfile, discover_etf_profiles
+from mxm_datakraken.sources.justetf.discovery.discover import (
+    ETFProfile,
+    discover_etf_profiles,
+)
 
 
 class DummyResp:
@@ -22,7 +25,7 @@ def test_discover_from_sample(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure discovery works correctly on a sample sitemap fixture."""
 
     # Load local XML fixture
-    sample_path: Path = Path(__file__).parent / "data" / "sample_sitemap.xml"
+    sample_path: Path = Path(__file__).parent.parent / "data" / "sample_sitemap.xml"
     xml_content: str = sample_path.read_text(encoding="utf-8")
 
     def fake_get(*args: Any, **kwargs: Any) -> DummyResp:  # type: ignore[no-untyped-def]
@@ -30,7 +33,7 @@ def test_discover_from_sample(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Monkeypatch requests.get to return our dummy response
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.discover.requests.get", fake_get
+        "mxm_datakraken.sources.justetf.discovery.discover.requests.get", fake_get
     )
 
     profiles: list[ETFProfile] = discover_etf_profiles("dummy-url")
