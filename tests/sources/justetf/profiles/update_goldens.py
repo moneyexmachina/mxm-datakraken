@@ -16,6 +16,7 @@ from mxm_datakraken.sources.justetf.profiles.parser import (
     extract_description,
     extract_listings,
     extract_name,
+    parse_profile,
 )
 
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -49,6 +50,11 @@ def main() -> None:
     listings = extract_listings(soup)
     (GOLDEN_DIR / "listings_table.json").write_text(
         json.dumps(listings, indent=2, ensure_ascii=False)
+    )
+    # Full profile
+    full_profile = parse_profile(html, "IE00B4L5Y983", source_url="dummy-url")
+    (GOLDEN_DIR / "full_profile.json").write_text(
+        json.dumps(full_profile, indent=2, ensure_ascii=False)
     )
 
     print(f"Golden fixtures updated in {GOLDEN_DIR}")

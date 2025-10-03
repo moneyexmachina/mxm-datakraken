@@ -1,29 +1,30 @@
+"""
+Regression test for the full profile parser.
+"""
+
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from mxm_datakraken.sources.justetf.profiles.parser import parse_profile
 
+DATA_DIR = Path(__file__).parent.parent / "data"
+HTML_PATH = DATA_DIR / "sample_etf.html"
+GOLDEN_DIR = DATA_DIR / "golden"
 
-def test_parse_profile_success() -> None:
-    """Should parse ISIN, name, description, and the Data table."""
-    html_path = Path(__file__).parent.parent / "data" / "sample_etf.html"
-    html = html_path.read_text(encoding="utf-8")
 
-    profile = parse_profile(html, "IE00B4L5Y983")
+def test_parse_profile_matches_golden() -> None:
+    """Full parser output should exactly match the golden profile snapshot."""
+    html = HTML_PATH.read_text(encoding="utf-8")
+    expected = json.loads(
+        (GOLDEN_DIR / "full_profile.json").read_text(encoding="utf-8")
+    )
 
-    # Top-level
-    assert profile["isin"] == "IE00B4L5Y983"
-    assert isinstance(profile["name"], str)
-    assert "iShares" in profile["name"]
+    actual = parse_profile(html, "IE00B4L5Y983", source_url="dummy-url")
 
-    # Data table essentials
-    data = profile["data"]
-    assert isinstance(data, dict)
-    assert data.get("Index") == "MSCI World"
-    assert "0.20%" in (data.get("Total expense ratio") or "")
-    assert data.get("Fund Provider") == "iShares"
+    # Ignore volatile fields
+    actual.pop("last_fetched", None)
+    expected.pop("last_fetched", None)
 
-    # Description contains the index name somewhere
-    desc = profile["description"]
-    assert isinstance(desc, str) and "MSCI World" in desc and len(desc) > 50
+    assert actual == expected
