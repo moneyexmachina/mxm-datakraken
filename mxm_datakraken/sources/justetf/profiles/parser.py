@@ -137,30 +137,35 @@ def extract_data_table(soup: BeautifulSoup) -> dict[str, str]:
     return data
 
 
-def extract_listings(soup: BeautifulSoup) -> list[dict[str, str]]:
-    listings: list[dict[str, str]] = []
-    table = soup.find("table", class_="mobile-table")
+def extract_listings(soup) -> list[dict[str, str]]:
+    """
+    Extract ETF listings from the 'Stock exchange' section.
+    Robust against other mobile-table uses (e.g. dividends).
+    """
+    listings = []
+
+    # 1️⃣ Find the section anchored by id="stock-exchange"
+    stock_anchor = soup.select_one("div#stock-exchange")
+    if not stock_anchor:
+        return listings
+
+    # 2️⃣ Find the nearest following table after the anchor
+    table = stock_anchor.find_next("table", class_="mobile-table")
     if not table:
         return listings
 
-    headers = [
-        th.get_text(" ", strip=True) for th in table.find("thead").find_all("th")
-    ]
+    # 3️⃣ Extract headers
+    headers = [th.get_text(strip=True) for th in table.select("thead th")]
+    # Normalize: collapse duplicate spaces and unify capitalization
+    headers = [h.replace("\xa0", " ").strip() for h in headers]
 
-    for row in table.find("tbody").find_all("tr"):
-        cells = row.find_all("td")
+    # 4️⃣ Extract rows
+    for tr in table.select("tbody tr"):
+        cells = [td.get_text(strip=True) for td in tr.select("td")]
         if len(cells) != len(headers):
+            # Sometimes rowspan/colspan causes mismatch — skip partial rows
             continue
-
-        row_dict: dict[str, str] = {}
-        for i, cell in enumerate(cells):
-            parts = [
-                t.strip()
-                for t in cell.stripped_strings
-                if t.strip() and t.strip() != "-"
-            ]
-            text = " ".join(parts)
-            row_dict[headers[i]] = text
-        listings.append(row_dict)
+        row = dict(zip(headers, cells))
+        listings.append(row)
 
     return listings

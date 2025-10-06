@@ -3,17 +3,15 @@ mxm_datakraken.sources.justetf.batch
 
 Batch orchestration for justETF data collection.
 
-This module coordinates:
-1) loading or refreshing the ETF Profile Index,
+Coordinates:
+1) loading or receiving the ETF Profile Index,
 2) downloading any missing ETF profiles,
 3) persisting them, and
 4) building a daily snapshot.
 
 Design notes:
-- No implicit network calls for downstream read APIs. This module is the
-  explicit "active" collection process.
 - Idempotent by default: if a profile already exists and force=False, we skip it.
-- Progress is logged to: profiles/runs/{run_id}/progress.jsonl with simple JSON lines.
+- Progress logged to: profiles/runs/{run_id}/progress.jsonl
 - OK markers: profiles/runs/{run_id}/ok/{isin}.ok
 - Error logs: profiles/runs/{run_id}/err/{isin}.json
 """
@@ -24,14 +22,12 @@ import json
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
 from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
-from mxm_datakraken.sources.justetf.profiles.parser import (
-    parse_profile,
-)
+from mxm_datakraken.sources.justetf.profiles.parser import parse_profile
 from mxm_datakraken.sources.justetf.profiles.persistence import (
     save_profile,
     save_profiles_snapshot,
@@ -40,30 +36,30 @@ from mxm_datakraken.sources.justetf.profiles.persistence import (
 
 def run_batch(
     base_path: Path,
+    index_entries: Sequence[dict] | None = None,
     rate_seconds: float = 2.0,
     force: bool = False,
     run_id: Optional[str] = None,
 ) -> Path:
     """
-    Run a full batch collection for justETF profiles.
-
-    Steps:
-      - Load the latest Profile Index (no network if snapshot exists).
-      - For each index entry, download/parse/save profile if missing (or if force=True).
-      - Log per-ISIN progress (ok/skip/err) and markers.
-      - Build a daily snapshot of profiles processed in this run.
+    Run a batch collection for justETF profiles.
 
     Args:
         base_path: Root data directory (contains profile_index/ and profiles/).
+        index_entries: Optional sequence of ETFProfileIndexEntry dicts to process.
+                       If None, the latest full index is loaded automatically.
         rate_seconds: Delay between requests for politeness.
-        force: If True, re-download even if a profile JSON already exists.
+        force: If True, re-download even if profile JSON already exists.
         run_id: Optional identifier for this run; defaults to current UTC timestamp.
 
     Returns:
         Path to the dated profiles snapshot JSON created for this run.
     """
-    # 1) Load the Profile Index (no network if snapshot exists)
-    index_entries = get_profile_index(base_path, force_refresh=False)
+    # 1) Load index entries
+    if index_entries is None:
+        index_entries = get_profile_index(base_path, force_refresh=False)
+
+    print(f"Starting batch for {len(index_entries)} ETFs...")
 
     # 2) Prepare run directories
     rid = run_id or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
@@ -79,14 +75,13 @@ def run_batch(
 
     progress_file = run_dir / "progress.jsonl"
 
-    # Target directory for stored profiles (flat by ISIN)
+    # Target directory for stored profiles
     profiles_dir = base_path / "profiles"
     profiles_dir.mkdir(parents=True, exist_ok=True)
 
-    # Profiles parsed during this run (used to build the snapshot)
     run_profiles: list[JustETFProfile] = []
 
-    # 3) Process each index entry
+    # 3) Process entries one by one
     for entry in index_entries:
         isin = entry["isin"]
         url = entry["url"]
@@ -100,8 +95,8 @@ def run_batch(
         try:
             html = download_etf_profile_html(isin, url)
             parsed: JustETFProfile = parse_profile(html, isin)
-            parsed["source_url"] = url  # provenance
-            save_profile(parsed, profiles_dir)
+            parsed["source_url"] = url
+            save_profile(parsed, base_path)
 
             run_profiles.append(parsed)
 
@@ -126,8 +121,13 @@ def run_batch(
                 encoding="utf-8",
             )
 
-    # 4) Build a dated snapshot from the profiles processed in this run
+    # 4) Build dated snapshot for profiles processed in this run
     snapshot_path = save_profiles_snapshot(
         run_profiles, base_path, as_of=date.today(), write_latest=True
+    )
+
+    print(
+        f"✅ Batch completed. Processed {len(run_profiles)} profiles. "
+        f"Snapshot saved to {snapshot_path}"
     )
     return snapshot_path
