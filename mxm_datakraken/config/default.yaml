@@ -1,0 +1,28 @@
+# ==============================================
+# mxm-datakraken/config/default.yaml
+# ----------------------------------------------
+# Defines base path structure and subdirectories
+# for sources handled by the datakraken package.
+# ==============================================
+
+paths:
+  # Fully resolved data root, composed from machine.yaml’s
+  # data_root_base, plus env and profile.
+  data_root: ${paths.data_root_base}/${mxm_env}/datakraken/${mxm_profile}
+
+  sources:
+    justetf:
+      root: ${paths.data_root}/sources/justetf
+
+      # Index of discovered ETF profile pages
+      profile_index_dir: ${paths.sources.justetf.root}/profile_index
+
+      # Individual ETF profile pages
+      profiles_dir: ${paths.sources.justetf.root}/profiles
+
+      # Optional: parsed reference-data exports (intermediate format)
+      parsed_dir: ${paths.sources.justetf.root}/parsed
+
+      # Optional: log files for scraping/rate-limit metadata
+      logs_dir: ${paths.sources.justetf.root}/logs
+

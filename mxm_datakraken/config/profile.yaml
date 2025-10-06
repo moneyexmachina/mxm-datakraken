@@ -1,0 +1,10 @@
+default:
+  sources:
+    justetf:
+      cache_policy: normal
+
+research:
+  sources:
+    justetf:
+      cache_policy: aggressive
+      parsed_dir: ${paths.sources.justetf.root}/parsed_research

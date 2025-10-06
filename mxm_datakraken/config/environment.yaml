@@ -1,0 +1,11 @@
+dev:
+  sources:
+    justetf:
+      use_cache: true
+      force_refresh: false
+
+prod:
+  sources:
+    justetf:
+      use_cache: false
+      force_refresh: true
