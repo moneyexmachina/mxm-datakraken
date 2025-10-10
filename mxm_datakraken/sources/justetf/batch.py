@@ -22,7 +22,7 @@ import json
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
@@ -35,8 +35,9 @@ from mxm_datakraken.sources.justetf.profiles.persistence import (
 
 
 def run_batch(
+    cfg: dict[str, Any],
     base_path: Path,
-    index_entries: Sequence[dict] | None = None,
+    index_entries: Sequence[dict[str, str]] | None = None,
     rate_seconds: float = 2.0,
     force: bool = False,
     run_id: Optional[str] = None,
@@ -45,19 +46,26 @@ def run_batch(
     Run a batch collection for justETF profiles.
 
     Args:
-        base_path: Root data directory (contains profile_index/ and profiles/).
-        index_entries: Optional sequence of ETFProfileIndexEntry dicts to process.
-                       If None, the latest full index is loaded automatically.
-        rate_seconds: Delay between requests for politeness.
-        force: If True, re-download even if profile JSON already exists.
-        run_id: Optional identifier for this run; defaults to current UTC timestamp.
+        cfg:
+            Resolved mxm-config mapping (required for DataIO-backed fetches).
+        base_path:
+            Root data directory (contains profile_index/ and profiles/).
+        index_entries:
+            Optional sequence of ETFProfileIndexEntry dicts to process.
+            If None, the latest full index is loaded automatically.
+        rate_seconds:
+            Delay between requests for politeness.
+        force:
+            If True, re-download even if profile JSON already exists.
+        run_id:
+            Optional identifier for this run; defaults to current UTC timestamp.
 
     Returns:
         Path to the dated profiles snapshot JSON created for this run.
     """
     # 1) Load index entries
     if index_entries is None:
-        index_entries = get_profile_index(base_path, force_refresh=False)
+        index_entries = get_profile_index(cfg, base_path, force_refresh=False)
 
     print(f"Starting batch for {len(index_entries)} ETFs...")
 
@@ -93,10 +101,10 @@ def run_batch(
             continue
 
         try:
-            html = download_etf_profile_html(isin, url)
+            html, resp = download_etf_profile_html(cfg, isin, url)
             parsed: JustETFProfile = parse_profile(html, isin)
             parsed["source_url"] = url
-            save_profile(parsed, base_path)
+            save_profile(parsed, base_path, provenance=resp)
 
             run_profiles.append(parsed)
 

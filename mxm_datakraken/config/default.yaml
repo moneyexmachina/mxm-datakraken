@@ -26,3 +26,12 @@ paths:
       # Optional: log files for scraping/rate-limit metadata
       logs_dir: ${paths.sources.justetf.root}/logs
 
+      dataio:
+        db_path:       ${paths.sources.justetf.root}/dataio.sqlite
+        responses_dir: ${paths.sources.justetf.root}/responses
+
+      http:
+        alias: http
+        user_agent: mxm-datakraken/0.2 (+contact@moneyexmachina.com)
+        default_timeout: 30.0         # seconds
+        politeness_ms: 1500

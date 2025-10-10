@@ -5,11 +5,31 @@ Tests for batch orchestration (profile_index → fetch missing profiles → snap
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
 from mxm_datakraken.sources.justetf.batch import run_batch
+
+
+@pytest.fixture
+def fake_io_response(tmp_path: Path) -> object:
+    """Minimal stand-in for mxm_dataio.models.Response."""
+    p = tmp_path / "payload.bin"
+    p.write_bytes(b"dummy")
+    return SimpleNamespace(
+        id="resp-prof",
+        request_id="req-prof",
+        path=str(p),
+        checksum=None,
+        sequence=None,
+        size_bytes=p.stat().st_size,
+        created_at=datetime.now(timezone.utc),
+        verify=lambda b: True,
+    )
 
 
 @pytest.fixture
@@ -26,8 +46,10 @@ def test_run_batch_downloads_and_snapshots(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     fake_profile_dict: dict[str, str],
+    fake_io_response: object,
 ) -> None:
     """Runs end-to-end with two ETFs, forcing download, and creates a snapshot."""
+    cfg: dict[str, Any] = {}
 
     # Fake profile index returns two ETFs
     index_entries = [
@@ -35,11 +57,15 @@ def test_run_batch_downloads_and_snapshots(
         {"isin": "IE00BBB22222", "url": "http://dummy/etf2"},
     ]
 
-    def fake_get_profile_index(*args, **kwargs):
+    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+        assert cfg_arg is cfg
         return index_entries
 
-    def fake_download_html(isin: str, url: str, timeout: int = 30) -> str:
-        return "<html>dummy</html>"
+    def fake_download_html(
+        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
+    ) -> str:
+        assert cfg_arg is cfg
+        return ("<html>dummy</html>", fake_io_response)
 
     def fake_parse_profile(html: str, isin: str):
         profile = fake_profile_dict.copy()
@@ -57,7 +83,9 @@ def test_run_batch_downloads_and_snapshots(
         "mxm_datakraken.sources.justetf.batch.parse_profile", fake_parse_profile
     )
 
-    snapshot_path = run_batch(tmp_path, rate_seconds=0.0, force=True, run_id="testrun")
+    snapshot_path = run_batch(
+        cfg, tmp_path, rate_seconds=0.0, force=True, run_id="testrun"
+    )
 
     # Snapshot exists and has 2 entries
     assert snapshot_path.exists()
@@ -82,20 +110,28 @@ def test_run_batch_downloads_and_snapshots(
 
 
 def test_run_batch_skips_existing_when_not_force(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_profile_dict: dict[str, str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_profile_dict: dict[str, str],
+    fake_io_response: object,
 ) -> None:
     """If a profile exists and force=False, it should be skipped and not re-downloaded."""
+    cfg: dict[str, Any] = {}
 
     index_entries = [
         {"isin": "IE00AAA11111", "url": "http://dummy/etf1"},
         {"isin": "IE00BBB22222", "url": "http://dummy/etf2"},
     ]
 
-    def fake_get_profile_index(*args, **kwargs):
+    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+        assert cfg_arg is cfg
         return index_entries
 
-    def fake_download_html(isin: str, url: str, timeout: int = 30) -> str:
-        return "<html>dummy</html>"
+    def fake_download_html(
+        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
+    ) -> str:
+        assert cfg_arg is cfg
+        return ("<html>dummy</html>", fake_io_response)
 
     def fake_parse_profile(html: str, isin: str):
         profile = fake_profile_dict.copy()
@@ -118,7 +154,9 @@ def test_run_batch_skips_existing_when_not_force(
         "mxm_datakraken.sources.justetf.batch.parse_profile", fake_parse_profile
     )
 
-    snapshot_path = run_batch(tmp_path, rate_seconds=0.0, force=False, run_id="skiprun")
+    snapshot_path = run_batch(
+        cfg, tmp_path, rate_seconds=0.0, force=False, run_id="skiprun"
+    )
     assert snapshot_path.exists()
 
     # Progress should contain one skip and one ok
@@ -134,22 +172,30 @@ def test_run_batch_skips_existing_when_not_force(
 
 
 def test_run_batch_logs_error_and_continues(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_profile_dict: dict[str, str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_profile_dict: dict[str, str],
+    fake_io_response: object,
 ) -> None:
     """If one download fails, it should log an error and continue processing others."""
+    cfg: dict[str, Any] = {}
 
     index_entries = [
         {"isin": "GOOD00000001", "url": "http://dummy/ok"},
         {"isin": "BAD000000002", "url": "http://dummy/fail"},
     ]
 
-    def fake_get_profile_index(*args, **kwargs):
+    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+        assert cfg_arg is cfg
         return index_entries
 
-    def fake_download_html(isin: str, url: str, timeout: int = 30) -> str:
+    def fake_download_html(
+        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
+    ) -> str:
+        assert cfg_arg is cfg
         if "fail" in url:
             raise RuntimeError("network boom")
-        return "<html>dummy</html>"
+        return ("<html>dummy</html>", fake_io_response)
 
     def fake_parse_profile(html: str, isin: str):
         profile = fake_profile_dict.copy()
@@ -167,7 +213,9 @@ def test_run_batch_logs_error_and_continues(
         "mxm_datakraken.sources.justetf.batch.parse_profile", fake_parse_profile
     )
 
-    snapshot_path = run_batch(tmp_path, rate_seconds=0.0, force=True, run_id="errrun")
+    snapshot_path = run_batch(
+        cfg, tmp_path, rate_seconds=0.0, force=True, run_id="errrun"
+    )
     assert snapshot_path.exists()
 
     # One ok, one err
@@ -187,16 +235,24 @@ def test_run_batch_logs_error_and_continues(
 
 
 def test_run_batch_respects_run_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_profile_dict: dict[str, str]
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_profile_dict: dict[str, str],
+    fake_io_response: object,
 ) -> None:
     """Custom run_id should be used as the runs/ subdirectory name."""
+    cfg: dict[str, Any] = {}
     index_entries = [{"isin": "IE00AAA11111", "url": "http://dummy/etf1"}]
 
-    def fake_get_profile_index(*args, **kwargs):
+    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+        assert cfg_arg is cfg
         return index_entries
 
-    def fake_download_html(isin: str, url: str, timeout: int = 30) -> str:
-        return "<html>dummy</html>"
+    def fake_download_html(
+        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
+    ) -> str:
+        assert cfg_arg is cfg
+        return ("<html>dummy</html>", fake_io_response)
 
     def fake_parse_profile(html: str, isin: str):
         profile = fake_profile_dict.copy()
@@ -214,5 +270,5 @@ def test_run_batch_respects_run_id(
         "mxm_datakraken.sources.justetf.batch.parse_profile", fake_parse_profile
     )
 
-    _ = run_batch(tmp_path, rate_seconds=0.0, force=True, run_id="myrunid-123")
+    _ = run_batch(cfg, tmp_path, rate_seconds=0.0, force=True, run_id="myrunid-123")
     assert (tmp_path / "profiles" / "runs" / "myrunid-123").exists()

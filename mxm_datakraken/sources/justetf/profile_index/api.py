@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 from mxm_datakraken.sources.justetf.profile_index.discover import (
+    SITEMAP_URL,
     ETFProfileIndexEntry,
     build_profile_index,
 )
@@ -21,31 +23,22 @@ from mxm_datakraken.sources.justetf.profile_index.persistence import (
 
 
 def get_profile_index(
+    cfg: dict[str, Any],
     base_path: Path,
     as_of: date | None = None,
     force_refresh: bool = False,
+    sitemap_url: str = SITEMAP_URL,
 ) -> list[ETFProfileIndexEntry]:
-    """
-    Get the ETF Profile Index discovered from justETF.
-
-    Args:
-        base_path: Root folder for storing index snapshots.
-        as_of: Optional date. If None, returns latest.
-               If provided, returns most recent snapshot <= as_of.
-        force_refresh: If True, force a new index build regardless of cache.
-
-    Returns:
-        List of ETFProfileIndexEntry dicts.
-    """
     if force_refresh:
-        index: list[ETFProfileIndexEntry] = build_profile_index()
-        save_profile_index(index, base_path, as_of=date.today())
-        return index
+        entries, resp = build_profile_index(cfg, sitemap_url=sitemap_url)
+        today = as_of or date.today()
+        save_profile_index(entries, base_path, as_of=today, provenance=resp)
+        return entries
 
     try:
         return load_profile_index(base_path, as_of=as_of)
     except (FileNotFoundError, ValueError):
-        # No cached data → fallback to fresh discovery
-        index = build_profile_index()
-        save_profile_index(index, base_path, as_of=date.today())
-        return index
+        entries, resp = build_profile_index(cfg, sitemap_url=sitemap_url)
+        today = as_of or date.today()
+        save_profile_index(entries, base_path, as_of=today, provenance=resp)
+        return entries

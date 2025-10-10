@@ -9,32 +9,52 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from mxm_dataio.models import Response as IoResponse
 
-def save_profile(profile: dict[str, Any], base_path: Path) -> Path:
-    """
-    Save a single ETF profile to {base_path}/profiles/{isin}.json.
+from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
 
-    Args:
-        profile: Parsed ETF profile dictionary, must include "isin".
-        base_path: Root directory for profile storage.
 
-    Returns:
-        Path to the written JSON file.
-    """
-    raw_isin = profile.get("isin")
-    if raw_isin is None or not isinstance(raw_isin, str) or not raw_isin.strip():
-        raise ValueError("Profile is missing required key 'isin'")
-
-    isin: str = raw_isin
-
-    profile_dir: Path = base_path / "profiles"
-    profile_dir.mkdir(parents=True, exist_ok=True)
-
-    path: Path = profile_dir / f"{isin}.json"
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(profile, f, ensure_ascii=False, indent=2)
-
+def _write_json(path: Path, data: dict[str, Any]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def _save_profile_provenance(base_path: Path, *, isin: str, resp: IoResponse) -> Path:
+    meta = {
+        "isin": isin,
+        "dataio_response_id": resp.id,
+        "dataio_request_id": resp.request_id,
+        "checksum": resp.checksum,
+        "path": resp.path,
+        "created_at": resp.created_at.isoformat(),
+        "sequence": resp.sequence,
+        "size_bytes": resp.size_bytes,
+    }
+    out = base_path / "profiles" / "provenance" / f"{isin}.json"
+    return _write_json(out, meta)
+
+
+def save_profile(
+    profile: JustETFProfile,
+    base_path: Path,
+    *,
+    provenance: IoResponse | None = None,  # NEW
+) -> Path:
+    """Persist a single parsed profile JSON and (optionally) its provenance sidecar."""
+    profiles_dir = base_path / "profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+    isin = profile.get("isin")
+    if not isinstance(isin, str) or not isin:
+        raise ValueError("profile missing isin")
+
+    out = profiles_dir / f"{isin}.json"
+    _write_json(out, profile)
+
+    if provenance is not None:
+        _save_profile_provenance(base_path, isin=isin, resp=provenance)
+
+    return out
 
 
 def save_profiles_snapshot(

@@ -11,6 +11,7 @@ python = "^3.13"
 requests = ">=2.32.5,<3.0.0"
 bs4 = ">=0.0.2,<0.0.3"
 mxm-config = { git = "https://github.com/moneyexmachina/mxm-config.git", tag = "v0.2.0" }
+mxm-dataio = { git = "https://github.com/moneyexmachina/mxm-dataio.git", tag = "v0.1.1" }
 rich = "^14.1.0"
 
 [build-system]

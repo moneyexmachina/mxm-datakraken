@@ -13,10 +13,14 @@ The result is the ETF Profile Index: a list of entries with ISIN and canonical U
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from typing import NotRequired, TypedDict
+from pathlib import Path
+from typing import Any, NotRequired, TypedDict
 from urllib.parse import parse_qs, urlparse
 
-import requests
+from mxm_dataio.api import DataIoSession
+from mxm_dataio.models import Response as IoResponse
+
+from mxm_datakraken.config.config import dataio_for_justetf
 
 SITEMAP_URL: str = "https://www.justetf.com/sitemap5.xml"
 NS: dict[str, str] = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
@@ -30,23 +34,75 @@ class ETFProfileIndexEntry(TypedDict):
     lastmod: NotRequired[str]
 
 
-def build_profile_index(sitemap_url: str = SITEMAP_URL) -> list[ETFProfileIndexEntry]:
+def _response_bytes(resp: IoResponse) -> bytes:
+    if not resp.path:
+        raise ValueError("DataIO Response has no payload path")
+    data = Path(resp.path).read_bytes()
+    if resp.checksum and not resp.verify(data):
+        raise ValueError("DataIO Response checksum mismatch")
+    return data
+
+
+def build_profile_index(
+    cfg: dict[str, Any],
+    sitemap_url: str = SITEMAP_URL,
+) -> tuple[list[ETFProfileIndexEntry], IoResponse]:
     """
-    Build the ETF Profile Index from the justETF sitemap.
+    Fetch and parse the justETF sitemap via mxm-dataio.
 
-    Args:
-        sitemap_url: URL of the justETF sitemap containing ETF profile pages.
+    Returns both the parsed entries and the DataIO Response so callers can
+    persist a snapshot and write a provenance sidecar.
 
-    Returns:
-        A list of ETFProfileIndexEntry dicts with keys:
-            - isin: ISIN string
-            - url: canonical URL (English `/en/` profile preferred)
-            - lastmod: optional last modification date if present
+    Parameters
+    ----------
+    cfg
+        Resolved mxm-config mapping (used by DataIoSession and adapter).
+    sitemap_url
+        Absolute URL of the justETF sitemap to fetch.
+
+    Returns
+    -------
+    tuple[list[ETFProfileIndexEntry], IoResponse]
+        (entries, dataio_response)
+
+    Raises
+    ------
+    ValueError
+        If the DataIO response has no payload path or fails checksum verification.
+    Exception
+        Any exception propagated from DataIoSession or the registered adapter.
     """
-    resp = requests.get(sitemap_url, headers={"User-Agent": "mxm-datakraken/0.1"})
-    resp.raise_for_status()
-    root: ET.Element = ET.fromstring(resp.content)
+    alias, dio_cfg = dataio_for_justetf(cfg)
+    with DataIoSession(source=alias, cfg=dio_cfg, use_cache=True) as io:
+        resp = io.fetch(
+            io.request(
+                kind="sitemap",
+                params={
+                    "url": sitemap_url,
+                    "method": "GET",
+                    "headers": {"Accept": "application/xml"},
+                },
+            )
+        )
 
+    xml_bytes = _response_bytes(resp)
+    entries = parse_profile_index_from_bytes(xml_bytes)
+    return entries, resp
+
+
+def parse_profile_index_from_bytes(xml_bytes: bytes) -> list[ETFProfileIndexEntry]:
+    """
+    Parse a justETF sitemap from raw bytes. Preferred when you have payloads
+    from mxm-dataio or you want ElementTree to honor the XML prolog encoding.
+    """
+    try:
+        root: ET.Element = ET.fromstring(xml_bytes)
+    except ET.ParseError:
+        return []
+    return _parse_index_from_root(root)
+
+
+def _parse_index_from_root(root: ET.Element) -> list[ETFProfileIndexEntry]:
     profiles: dict[str, ETFProfileIndexEntry] = {}
 
     for url_el in root.findall("sm:url", NS):
@@ -54,6 +110,8 @@ def build_profile_index(sitemap_url: str = SITEMAP_URL) -> list[ETFProfileIndexE
         if loc_el is None or loc_el.text is None:
             continue
         loc: str = loc_el.text.strip()
+        if not loc:
+            continue
 
         lastmod_el = url_el.find("sm:lastmod", NS)
         lastmod: str | None = (
@@ -62,30 +120,18 @@ def build_profile_index(sitemap_url: str = SITEMAP_URL) -> list[ETFProfileIndexE
             else None
         )
 
-        # Extract ISIN from query string
         parsed = urlparse(loc)
         qs = parse_qs(parsed.query)
-        isin: str | None = qs.get("isin", [None])[0]
-        if isin is None:
+        isin: str | None = (qs.get("isin") or [None])[0]
+        if not isin:
             continue
 
         entry: ETFProfileIndexEntry = {"isin": isin, "url": loc}
         if lastmod is not None:
             entry["lastmod"] = lastmod
 
-        # Deduplicate: prefer English version
-        if isin not in profiles:
+        existing = profiles.get(isin)
+        if existing is None or ("/en/" in loc and "/en/" not in existing["url"]):
             profiles[isin] = entry
-        else:
-            existing = profiles[isin]
-            if "/en/" in loc and "/en/" not in existing["url"]:
-                profiles[isin] = entry
 
     return list(profiles.values())
-
-
-if __name__ == "__main__":
-    index: list[ETFProfileIndexEntry] = build_profile_index()
-    print(f"Built ETF Profile Index with {len(index)} entries.")
-    for entry in index[:10]:
-        print(entry)
