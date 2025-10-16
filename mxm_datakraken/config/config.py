@@ -7,45 +7,47 @@ expects for JustETF, and centralizes where we read the adapter alias from.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # type-only import; no runtime dependency here
+    from omegaconf import DictConfig
 
 
-def _get(d: dict[str, Any], *keys: str, default: Any = None) -> Any:
-    cur: Any = d
-    for k in keys:
-        if not isinstance(cur, dict) or k not in cur:
-            return default
-        cur = cur[k]
-    return cur
-
-
-def dataio_for_justetf(cfg: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def dataio_for_justetf(cfg: "DictConfig") -> tuple[str, dict[str, Any]]:
     """
     Return (adapter_alias, dataio_cfg) for JustETF.
 
-    Expected config (default.yaml):
-      paths.sources.justetf.root
-      paths.sources.justetf.dataio.{db_path,responses_dir}
-      paths.sources.justetf.http.alias   # optional, defaults to "http"
+    Required (mxm-datakraken default.yaml):
+      paths.sources.justetf.root: str
+      paths.sources.justetf.dataio.db_path: str
+      paths.sources.justetf.dataio.responses_dir: str
+    Optional:
+      paths.sources.justetf.http.alias: str (defaults to "http")
     """
-    root = _get(cfg, "paths", "sources", "justetf", "root")
-    dio = _get(cfg, "paths", "sources", "justetf", "dataio", default={})
-    alias = _get(cfg, "paths", "sources", "justetf", "http", "alias", default="http")
-
-    if not isinstance(root, str) or not root:
-        raise ValueError("config missing paths.sources.justetf.root")
-    db_path = dio.get("db_path")
-    responses_dir = dio.get("responses_dir")
-    if not (isinstance(db_path, str) and isinstance(responses_dir, str)):
+    try:
+        j = cfg.paths.sources.justetf
+        root = str(j.root)
+        db_path = str(j.dataio.db_path)
+        responses_dir = str(j.dataio.responses_dir)
+        alias = str(getattr(getattr(j, "http", None), "alias", "http"))
+    except Exception as e:
+        # Fail fast with a precise message; this is a programming/config error
         raise ValueError(
-            "config missing paths.sources.justetf.dataio.{db_path,responses_dir}"
+            "justetf config incomplete. Expected "
+            "paths.sources.justetf.{root, dataio.{db_path,responses_dir}, http.alias?}"
+        ) from e
+
+    if not root or not db_path or not responses_dir:
+        raise ValueError(
+            "justetf config requires non-empty "
+            "paths.sources.justetf.root and dataio.{db_path,responses_dir}"
         )
 
-    dataio_cfg = {
+    dataio_cfg: dict[str, Any] = {
         "paths": {
             "data_root": root,
-            "db_path": db_path,
-            "responses_dir": responses_dir,
+            "db_path": db_path,  # required by mxm-dataio
+            "responses_dir": responses_dir,  # required by mxm-dataio
         }
     }
-    return str(alias), dataio_cfg
+    return alias or "http", dataio_cfg
