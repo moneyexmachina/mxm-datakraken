@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mxm-datakraken"
-version = "0.1.0"
+version = "0.1.2"
 description = "MXM data ingestion and collection package – scrapers and connectors for external data sources."
 authors = ["mxm <contact@moneyexmachina.com>"]
 license = "MIT"
@@ -10,8 +10,8 @@ readme = "README.md"
 python = "^3.13"
 requests = ">=2.32.5,<3.0.0"
 bs4 = ">=0.0.2,<0.0.3"
-mxm-config = { git = "https://github.com/moneyexmachina/mxm-config.git", tag = "v0.2.0" }
-mxm-dataio = { git = "https://github.com/moneyexmachina/mxm-dataio.git", tag = "v0.1.1" }
+mxm-config = { git = "https://github.com/moneyexmachina/mxm-config.git", rev="cd2d4066f28a49b992be111b51e44e0ed70c3f0f" }
+mxm-dataio = { git = "https://github.com/moneyexmachina/mxm-dataio.git", rev="fa70838fdcf31582a63880332fe711956b652eab" }
 rich = "^14.1.0"
 
 [build-system]
