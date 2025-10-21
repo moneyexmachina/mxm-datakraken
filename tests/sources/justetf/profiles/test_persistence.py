@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
+from mxm_datakraken.sources.justetf.common.models import JustETFProfile
 from mxm_datakraken.sources.justetf.profiles.persistence import (
     save_profile,
     save_profiles_snapshot,

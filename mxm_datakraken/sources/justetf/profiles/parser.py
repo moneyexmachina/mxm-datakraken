@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 from bs4 import BeautifulSoup, Tag
 
-from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
+from mxm_datakraken.sources.justetf.common.models import JustETFProfile
 
 
 def parse_profile(

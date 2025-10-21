@@ -24,9 +24,9 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
+from mxm_datakraken.sources.justetf.common.models import JustETFProfile
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
-from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
 from mxm_datakraken.sources.justetf.profiles.parser import parse_profile
 from mxm_datakraken.sources.justetf.profiles.persistence import (
     save_profile,

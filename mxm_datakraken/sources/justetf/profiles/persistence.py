@@ -11,7 +11,7 @@ from typing import Any
 
 from mxm_dataio.models import Response as IoResponse
 
-from mxm_datakraken.sources.justetf.profiles.model import JustETFProfile
+from mxm_datakraken.sources.justetf.common.models import JustETFProfile
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> Path:
