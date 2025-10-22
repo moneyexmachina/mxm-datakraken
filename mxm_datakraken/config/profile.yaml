@@ -1,10 +1,6 @@
 default:
-  sources:
-    justetf:
-      cache_policy: normal
+  mxm_datakraken: {}
 
 research:
-  sources:
-    justetf:
-      cache_policy: aggressive
-      parsed_dir: ${paths.sources.justetf.root}/parsed_research
+  mxm_datakraken:
+    paths.sources.justetf.parsed_dir: ${mxm_datakraken.paths.sources.justetf.root}/parsed_research

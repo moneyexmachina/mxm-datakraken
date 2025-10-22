@@ -5,15 +5,12 @@ This module translates the app config into the minimal shape that mxm-dataio
 expects for JustETF, and centralizes where we read the adapter alias from.
 """
 
-from __future__ import annotations
+from typing import Tuple
 
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:  # type-only import; no runtime dependency here
-    from omegaconf import DictConfig
+from mxm_config import MXMConfig, make_subconfig
 
 
-def dataio_for_justetf(cfg: "DictConfig") -> tuple[str, dict[str, Any]]:
+def dataio_for_justetf(cfg: MXMConfig) -> Tuple[str, MXMConfig]:
     """
     Return (adapter_alias, dataio_cfg) for JustETF.
 
@@ -43,11 +40,13 @@ def dataio_for_justetf(cfg: "DictConfig") -> tuple[str, dict[str, Any]]:
             "paths.sources.justetf.root and dataio.{db_path,responses_dir}"
         )
 
-    dataio_cfg: dict[str, Any] = {
-        "paths": {
-            "data_root": root,
-            "db_path": db_path,  # required by mxm-dataio
-            "responses_dir": responses_dir,  # required by mxm-dataio
+    dataio_cfg: MXMConfig = make_subconfig(
+        {
+            "paths": {
+                "data_root": root,
+                "db_path": db_path,  # required by mxm-dataio
+                "responses_dir": responses_dir,  # required by mxm-dataio
+            }
         }
-    }
+    )
     return alias or "http", dataio_cfg

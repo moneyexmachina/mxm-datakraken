@@ -1,37 +1,58 @@
-# ==============================================
-# mxm-datakraken/config/default.yaml
-# ----------------------------------------------
-# Defines base path structure and subdirectories
-# for sources handled by the datakraken package.
-# ==============================================
-
+# Central path scaffold (machine/env/profile-aware; keep as-is)
 paths:
-  # Fully resolved data root, composed from machine.yaml’s
-  # data_root_base, plus env and profile.
   data_root: ${paths.data_root_base}/${mxm_env}/datakraken/${mxm_profile}
+
+# Vendored (tiny) mxm-dataio defaults for local interpolation
+mxm_dataio:
+  http:
+    timeout_s: 20.0
+    retries: { max_attempts: 3, backoff_ms: [500, 1000, 2000] }
+    politeness_ms: 1000
+    verify_ssl: true
+    headers: { User-Agent: mxm-dataio/0.3 (+contact@moneyexmachina.com) }
+  serialization: { response_format: raw, compression: none, hash_algo: sha256 }
+  audit:
+    record_request: true
+    record_response: true
+    record_parse_log: true
+    redact_headers: ["Authorization", "Cookie"]
+    max_payload_bytes: 5242880
+  cache: { use_cache: true, write_cache: true, force_refresh: false }
+  concurrency: { workers: 8 }
+
+# Package subtree
+mxm_datakraken:
+  paths:
+    root: ${paths.data_root}
+    sources:
+      justetf:
+        root: ${mxm_datakraken.paths.root}/sources/justetf
+        profile_index_dir: ${mxm_datakraken.paths.sources.justetf.root}/profile_index
+        profiles_dir:       ${mxm_datakraken.paths.sources.justetf.root}/profiles
+        parsed_dir:         ${mxm_datakraken.paths.sources.justetf.root}/parsed
+        logs_dir:           ${mxm_datakraken.paths.sources.justetf.root}/logs
+        dataio:
+          db_path:       ${mxm_datakraken.paths.sources.justetf.root}/dataio.sqlite
+          responses_dir: ${mxm_datakraken.paths.sources.justetf.root}/responses
 
   sources:
     justetf:
-      root: ${paths.data_root}/sources/justetf
-
-      # Index of discovered ETF profile pages
-      profile_index_dir: ${paths.sources.justetf.root}/profile_index
-
-      # Individual ETF profile pages
-      profiles_dir: ${paths.sources.justetf.root}/profiles
-
-      # Optional: parsed reference-data exports (intermediate format)
-      parsed_dir: ${paths.sources.justetf.root}/parsed
-
-      # Optional: log files for scraping/rate-limit metadata
-      logs_dir: ${paths.sources.justetf.root}/logs
+      http:
+        base_url: https://www.justetf.com
+        headers:
+          User-Agent: mxm-datakraken/0.3 (+contact@moneyexmachina.com)
+        timeout_s: ${mxm_dataio.http.timeout_s}
+        politeness_ms: ${mxm_dataio.http.politeness_ms}
+        retries: ${mxm_dataio.http.retries}
+        verify_ssl: ${mxm_dataio.http.verify_ssl}
 
       dataio:
-        db_path:       ${paths.sources.justetf.root}/dataio.sqlite
-        responses_dir: ${paths.sources.justetf.root}/responses
+        serialization: ${mxm_dataio.serialization}
+        audit: ${mxm_dataio.audit}
+        cache: ${mxm_dataio.cache}
+        concurrency: ${mxm_dataio.concurrency}
 
-      http:
-        alias: http
-        user_agent: mxm-datakraken/0.2 (+contact@moneyexmachina.com)
-        default_timeout: 30.0         # seconds
-        politeness_ms: 1500
+      scraping:
+        concurrency: 4
+        retry: { max_attempts: 3, backoff_ms: [500, 1000, 2000] }
+        live_smoke_isins: []
