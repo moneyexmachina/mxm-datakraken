@@ -7,14 +7,16 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence, Union
 
 from mxm_dataio.models import Response as IoResponse
 
 from mxm_datakraken.sources.justetf.common.models import JustETFProfile
 
+JSONLike = Union[Mapping[str, Any], Sequence[Any]]
 
-def _write_json(path: Path, data: dict[str, Any]) -> Path:
+
+def _write_json(path: Path, data: JSONLike) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
@@ -39,15 +41,14 @@ def save_profile(
     profile: JustETFProfile,
     base_path: Path,
     *,
-    provenance: IoResponse | None = None,  # NEW
+    provenance: IoResponse | None = None,
 ) -> Path:
     """Persist a single parsed profile JSON and (optionally) its provenance sidecar."""
     profiles_dir = base_path / "profiles"
     profiles_dir.mkdir(parents=True, exist_ok=True)
     isin = profile.get("isin")
-    if not isinstance(isin, str) or not isin:
-        raise ValueError("profile missing isin")
-
+    if not isinstance(isin, str) or not isin:  # pyright: ignore[reportUnnecessaryIsInstance]
+        raise ValueError("Profile must include non-empty 'isin' (str)")
     out = profiles_dir / f"{isin}.json"
     _write_json(out, profile)
 
@@ -58,7 +59,7 @@ def save_profile(
 
 
 def save_profiles_snapshot(
-    profiles: list[dict[str, Any]],
+    profiles: Sequence[Mapping[str, Any]],
     base_path: Path,
     as_of: date | None = None,
     write_latest: bool = True,

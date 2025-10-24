@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Any
+
+from mxm_config import MXMConfig
 
 from mxm_datakraken.sources.justetf.profile_index.discover import (
     SITEMAP_URL,
@@ -23,7 +24,7 @@ from mxm_datakraken.sources.justetf.profile_index.persistence import (
 
 
 def get_profile_index(
-    cfg: dict[str, Any],
+    cfg: MXMConfig,
     base_path: Path,
     as_of: date | None = None,
     force_refresh: bool = False,

@@ -1,6 +1,4 @@
 """
-mxm_datakraken.sources.justetf.batch
-
 Batch orchestration for justETF data collection.
 
 Coordinates:
@@ -22,9 +20,14 @@ import json
 import time
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Sequence
+from typing import Optional, Sequence, cast
 
-from mxm_datakraken.sources.justetf.common.models import JustETFProfile
+from mxm_config import MXMConfig
+
+from mxm_datakraken.sources.justetf.common.models import (
+    ETFProfileIndexEntry,
+    JustETFProfile,
+)
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
 from mxm_datakraken.sources.justetf.profiles.parser import parse_profile
@@ -35,9 +38,9 @@ from mxm_datakraken.sources.justetf.profiles.persistence import (
 
 
 def run_batch(
-    cfg: dict[str, Any],
+    cfg: MXMConfig,
     base_path: Path,
-    index_entries: Sequence[dict[str, str]] | None = None,
+    index_entries: Optional[Sequence[ETFProfileIndexEntry]] = None,
     rate_seconds: float = 2.0,
     force: bool = False,
     run_id: Optional[str] = None,
@@ -67,7 +70,12 @@ def run_batch(
     if index_entries is None:
         index_entries = get_profile_index(cfg, base_path, force_refresh=False)
 
-    print(f"Starting batch for {len(index_entries)} ETFs...")
+    # Narrow for the type checker
+    entries: Sequence[ETFProfileIndexEntry] = cast(
+        Sequence[ETFProfileIndexEntry], index_entries
+    )
+
+    print(f"Starting batch for {len(entries)} ETFs...")
 
     # 2) Prepare run directories
     rid = run_id or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%S")
@@ -90,7 +98,7 @@ def run_batch(
     run_profiles: list[JustETFProfile] = []
 
     # 3) Process entries one by one
-    for entry in index_entries:
+    for entry in entries:
         isin = entry["isin"]
         url = entry["url"]
 

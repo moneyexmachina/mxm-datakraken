@@ -14,24 +14,17 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict
 from urllib.parse import parse_qs, urlparse
 
+from mxm_config import MXMConfig
 from mxm_dataio.api import DataIoSession
 from mxm_dataio.models import Response as IoResponse
 
 from mxm_datakraken.config.config import dataio_for_justetf
+from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
 
 SITEMAP_URL: str = "https://www.justetf.com/sitemap5.xml"
 NS: dict[str, str] = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-
-
-class ETFProfileIndexEntry(TypedDict):
-    """Single entry in the ETF Profile Index (from sitemap)."""
-
-    isin: str
-    url: str
-    lastmod: NotRequired[str]
 
 
 def _response_bytes(resp: IoResponse) -> bytes:
@@ -44,7 +37,7 @@ def _response_bytes(resp: IoResponse) -> bytes:
 
 
 def build_profile_index(
-    cfg: dict[str, Any],
+    cfg: MXMConfig,
     sitemap_url: str = SITEMAP_URL,
 ) -> tuple[list[ETFProfileIndexEntry], IoResponse]:
     """

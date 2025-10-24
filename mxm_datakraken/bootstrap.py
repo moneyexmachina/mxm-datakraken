@@ -1,102 +1,126 @@
+"""
+Bootstrap adapter registration for mxm-datakraken.
+
+This module wires up transport adapters (currently: a requests-based HTTP adapter)
+into the mxm-dataio registry using values sourced from the package’s MXMConfig.
+It performs **no implicit side effects on import**; callers should invoke
+`register_adapters_from_config(cfg)` from an explicit entry point (CLI, script,
+or test) once the config is loaded.
+
+Configuration
+-------------
+The HTTP adapter is configured under:
+
+    sources.justetf.dataio.adapters.http
+
+Example (`default.yaml`):
+
+    sources:
+      justetf:
+        dataio:
+          adapters:
+            http:
+              enabled: true
+              alias: "justetf"  # registry key; use "http" if sharing a single adapter
+              user_agent: "mxm-datakraken/0.2 (contact@moneyexmachina.com)"
+              default_timeout: 30.0
+              default_headers:
+                Accept: "*/*"
+
+Behavior & guarantees
+---------------------
+- Reads adapter settings via MXMConfig **views** (dot access), no dict casting.
+- Registers an `HttpRequestsAdapter` under the chosen alias.
+- Safe to call multiple times; duplicate registrations are soft-failed (ignored).
+- If the config subtree is missing or disabled, registration is skipped.
+- Designed to be source-scoped (JustETF) but trivially extensible to more adapters.
+
+Usage
+-----
+    from mxm_config import load_config
+    from mxm_datakraken.bootstrap import register_adapters_from_config
+
+    cfg = load_config(package="mxm-datakraken", env="dev", profile="default")
+    register_adapters_from_config(cfg)
+
+Testing
+-------
+In unit tests, monkeypatch the registry to assert the call without touching global state:
+
+    def test_bootstrap_registers(monkeypatch):
+        calls = {}
+        def fake_register(alias, adapter):
+            calls["alias"] = alias
+            calls["type"] = type(adapter).__name__
+        monkeypatch.setattr("mxm_dataio.registry.register", fake_register)
+        register_adapters_from_config(cfg)
+        assert calls == {"alias": "justetf", "type": "HttpRequestsAdapter"}
+"""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping, Union, cast
+from typing import Any, Mapping, Optional, cast
 
+from mxm_config import MXMConfig
 from mxm_dataio.registry import register
 
 from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
-
-if TYPE_CHECKING:
-    # Only for type checking; avoids a hard runtime dep here
-    from omegaconf import DictConfig  # pragma: no cover
-else:
-    DictConfig = object  # type: ignore[misc,assignment]
+from mxm_datakraken.config.config import justetf_http_adapter_view
 
 
-ConfigLike = Union[Mapping[str, Any], "DictConfig"]
-
-
-def _to_plain_dict(cfg: ConfigLike) -> Mapping[str, Any]:
-    """
-    Convert a DictConfig to a plain dict if OmegaConf is available.
-    If cfg is already a Mapping, return it as-is.
-
-    We import OmegaConf lazily to avoid making it a hard dependency of datakraken.
-    """
-    if isinstance(cfg, Mapping):
-        return cfg
-
-    try:  # pragma: no cover - exercised in integration, trivial to test if needed
-        from omegaconf import OmegaConf  # type: ignore
+def _coerce_headers(m: Optional[Mapping[str, Any]]) -> Optional[Mapping[str, str]]:
+    if m is None:
+        return None
+    # Keep it defensive: if node isn't a Mapping at runtime, just ignore.
+    try:
+        return {str(k): str(v) for k, v in m.items()}
     except Exception:
-        # Fall back: treat it as Mapping at runtime (best-effort)
-        return cast(Mapping[str, Any], cfg)
-
-    as_dict = OmegaConf.to_container(cfg, resolve=False)
-    # OmegaConf returns a dict[str, Any] (or nested dicts/lists)
-    return cast(Mapping[str, Any], as_dict)
+        return None
 
 
-def _get_path(d: Mapping[str, Any], *keys: str, default: Any = None) -> Any:
+def register_adapters_from_config(cfg: MXMConfig, strict: bool = False) -> None:
     """
-    Defensive nested-get helper for plain dict-like configs.
-    Example: _get_path(cfg, "dataio", "adapters", "http", default={})
+    Register DataIO adapters based on package config (JustETF-specific).
+    Uses MXMConfig views and dot-access only; no dict conversion.
     """
-    cur: Any = d
-    for k in keys:
-        if not isinstance(cur, Mapping):  # type: ignore[unreachable]
-            return default
-        if k not in cur:
-            return default
-        cur = cur[k]
-    return cur
+    # If the node doesn't exist, make_view may raise; treat as "not configured".
+    try:
+        http = justetf_http_adapter_view(cfg, resolve=True)
+    except Exception as e:
+        if strict:
+            raise RuntimeError(
+                "Adapter config missing: sources.justetf.dataio.adapters.http"
+            ) from e
+        return
 
+    # Dot access only; fall back to sane defaults if fields are missing.
+    enabled = getattr(http, "enabled", True)
+    if not bool(enabled):
+        return
 
-def register_adapters_from_config(cfg: ConfigLike) -> None:
-    """
-    Register dataio adapters explicitly, driven by mxm-config.
+    alias = str(getattr(http, "alias", "justetf"))
+    user_agent = str(
+        getattr(http, "user_agent", "mxm-datakraken/0.2 (contact@moneyexmachina.com)")
+    )
+    default_timeout = float(getattr(http, "default_timeout", 30.0))
 
-    Expected config shape (example):
+    raw_headers_any = getattr(http, "default_headers", None)
+    raw_headers = (
+        cast(Optional[Mapping[str, Any]], raw_headers_any)
+        if isinstance(raw_headers_any, Mapping)
+        else None
+    )
+    headers = _coerce_headers(raw_headers)
 
-      dataio:
-        adapters:
-          http:
-            enabled: true
-            alias: "http"                     # or "justetf" if you want per-source aliasing
-            user_agent: "mxm-datakraken/0.2 (contact@moneyexmachina.com)"
-            default_timeout: 30.0
-            default_headers:
-              Accept: "*/*"
-
-    Notes:
-    - This function is idempotent at the registry level (duplicates may be ignored by the registry).
-    - Keep this bootstrap explicit in your app entry points; no auto-registration on import.
-    """
-    plain = _to_plain_dict(cfg)
-
-    http_cfg = _get_path(plain, "dataio", "adapters", "http", default=None)
-    if isinstance(http_cfg, Mapping) and http_cfg.get("enabled", True):
-        alias = str(http_cfg.get("alias", "http"))
-        user_agent = str(
-            http_cfg.get(
-                "user_agent", "mxm-datakraken/0.2 (contact@moneyexmachina.com)"
-            )
+    try:
+        register(
+            alias,
+            HttpRequestsAdapter(
+                user_agent=user_agent,
+                default_timeout=default_timeout,
+                default_headers=headers,
+            ),
         )
-        default_timeout = float(http_cfg.get("default_timeout", 30.0))
-        default_headers = cast(
-            Mapping[str, str] | None, http_cfg.get("default_headers") or None
-        )
-
-        try:
-            register(
-                alias,
-                HttpRequestsAdapter(  # type: ignore[arg-type]
-                    user_agent=user_agent,
-                    default_timeout=default_timeout,
-                    default_headers=default_headers,
-                ),
-            )
-        except Exception:
-            # If registry rejects duplicates or dataio isn't active in this process,
-            # fail softly to keep bootstrap side-effect free.
-            pass
+    except Exception:
+        # Soft-fail: ignore duplicate registrations or missing registry in this process.
+        pass

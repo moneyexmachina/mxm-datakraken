@@ -19,6 +19,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from mxm_config import MXMConfig
 from mxm_dataio.api import DataIoSession
 from mxm_dataio.models import Response as IoResponse
 
@@ -43,7 +44,7 @@ def _response_bytes(resp: IoResponse) -> bytes:
 
 
 def download_etf_profile_html(
-    cfg: dict[str, Any],
+    cfg: MXMConfig,
     isin: str,
     url: str,
     timeout: float | int = 30,

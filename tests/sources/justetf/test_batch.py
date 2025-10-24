@@ -8,11 +8,16 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, List, Tuple, cast
 
 import pytest
+from mxm_config import MXMConfig
 
 from mxm_datakraken.sources.justetf.batch import run_batch
+
+
+def _verify_ok(_b: bytes) -> bool:
+    return True
 
 
 @pytest.fixture
@@ -28,12 +33,13 @@ def fake_io_response(tmp_path: Path) -> object:
         sequence=None,
         size_bytes=p.stat().st_size,
         created_at=datetime.now(timezone.utc),
-        verify=lambda b: True,
+        verify=_verify_ok,
     )
 
 
 @pytest.fixture
-def fake_profile_dict() -> dict[str, str]:
+def fake_profile_dict() -> dict[str, Any]:
+    # Not a full JustETFProfile on purpose; batch fills in source_url later
     return {
         "isin": "DUMMY",
         "name": "Dummy Fund",
@@ -45,30 +51,34 @@ def fake_profile_dict() -> dict[str, str]:
 def test_run_batch_downloads_and_snapshots(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    fake_profile_dict: dict[str, str],
+    fake_profile_dict: dict[str, Any],
     fake_io_response: object,
 ) -> None:
     """Runs end-to-end with two ETFs, forcing download, and creates a snapshot."""
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
 
     # Fake profile index returns two ETFs
-    index_entries = [
+    index_entries: list[dict[str, str]] = [
         {"isin": "IE00AAA11111", "url": "http://dummy/etf1"},
         {"isin": "IE00BBB22222", "url": "http://dummy/etf2"},
     ]
 
-    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+    def fake_get_profile_index(
+        cfg_arg: MXMConfig, base_path: Path, **_: Any
+    ) -> list[dict[str, str]]:
         assert cfg_arg is cfg
         return index_entries
 
     def fake_download_html(
-        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
-    ) -> str:
+        cfg_arg: MXMConfig, isin: str, url: str, timeout: int = 30
+    ) -> Tuple[str, object]:
         assert cfg_arg is cfg
+        _ = (isin, url, timeout)
         return ("<html>dummy</html>", fake_io_response)
 
-    def fake_parse_profile(html: str, isin: str):
-        profile = fake_profile_dict.copy()
+    def fake_parse_profile(html: str, isin: str) -> dict[str, Any]:
+        _ = html
+        profile = dict(fake_profile_dict)
         profile["isin"] = isin
         return profile
 
@@ -89,18 +99,20 @@ def test_run_batch_downloads_and_snapshots(
 
     # Snapshot exists and has 2 entries
     assert snapshot_path.exists()
-    content = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    content: list[dict[str, Any]] = json.loads(
+        snapshot_path.read_text(encoding="utf-8")
+    )
     assert isinstance(content, list)
     assert len(content) == 2
 
     # Progress log has 2 "ok" statuses
-    progress_lines = (
+    progress_lines: List[str] = (
         (tmp_path / "profiles" / "runs" / "testrun" / "progress.jsonl")
         .read_text(encoding="utf-8")
         .strip()
         .splitlines()
     )
-    statuses = [json.loads(line)["status"] for line in progress_lines]
+    statuses: list[str] = [json.loads(line)["status"] for line in progress_lines]
     assert statuses.count("ok") == 2
 
     # OK markers exist
@@ -112,29 +124,33 @@ def test_run_batch_downloads_and_snapshots(
 def test_run_batch_skips_existing_when_not_force(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    fake_profile_dict: dict[str, str],
+    fake_profile_dict: dict[str, Any],
     fake_io_response: object,
 ) -> None:
     """If a profile exists and force=False, it should be skipped and not re-downloaded."""
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
 
-    index_entries = [
+    index_entries: list[dict[str, str]] = [
         {"isin": "IE00AAA11111", "url": "http://dummy/etf1"},
         {"isin": "IE00BBB22222", "url": "http://dummy/etf2"},
     ]
 
-    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+    def fake_get_profile_index(
+        cfg_arg: MXMConfig, base_path: Path, **_: Any
+    ) -> list[dict[str, str]]:
         assert cfg_arg is cfg
         return index_entries
 
     def fake_download_html(
-        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
-    ) -> str:
+        cfg_arg: MXMConfig, isin: str, url: str, timeout: int = 30
+    ) -> Tuple[str, object]:
         assert cfg_arg is cfg
+        _ = (isin, url, timeout)
         return ("<html>dummy</html>", fake_io_response)
 
-    def fake_parse_profile(html: str, isin: str):
-        profile = fake_profile_dict.copy()
+    def fake_parse_profile(html: str, isin: str) -> dict[str, Any]:
+        _ = html
+        profile = dict(fake_profile_dict)
         profile["isin"] = isin
         return profile
 
@@ -160,13 +176,13 @@ def test_run_batch_skips_existing_when_not_force(
     assert snapshot_path.exists()
 
     # Progress should contain one skip and one ok
-    progress_lines = (
+    progress_lines: List[str] = (
         (tmp_path / "profiles" / "runs" / "skiprun" / "progress.jsonl")
         .read_text(encoding="utf-8")
         .strip()
         .splitlines()
     )
-    statuses = [json.loads(line)["status"] for line in progress_lines]
+    statuses: list[str] = [json.loads(line)["status"] for line in progress_lines]
     assert statuses.count("skip") == 1
     assert statuses.count("ok") == 1
 
@@ -174,31 +190,35 @@ def test_run_batch_skips_existing_when_not_force(
 def test_run_batch_logs_error_and_continues(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    fake_profile_dict: dict[str, str],
+    fake_profile_dict: dict[str, Any],
     fake_io_response: object,
 ) -> None:
     """If one download fails, it should log an error and continue processing others."""
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
 
-    index_entries = [
+    index_entries: list[dict[str, str]] = [
         {"isin": "GOOD00000001", "url": "http://dummy/ok"},
         {"isin": "BAD000000002", "url": "http://dummy/fail"},
     ]
 
-    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+    def fake_get_profile_index(
+        cfg_arg: MXMConfig, base_path: Path, **_: Any
+    ) -> list[dict[str, str]]:
         assert cfg_arg is cfg
         return index_entries
 
     def fake_download_html(
-        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
-    ) -> str:
+        cfg_arg: MXMConfig, isin: str, url: str, timeout: int = 30
+    ) -> Tuple[str, object]:
         assert cfg_arg is cfg
         if "fail" in url:
             raise RuntimeError("network boom")
+        _ = (isin, timeout)
         return ("<html>dummy</html>", fake_io_response)
 
-    def fake_parse_profile(html: str, isin: str):
-        profile = fake_profile_dict.copy()
+    def fake_parse_profile(html: str, isin: str) -> dict[str, Any]:
+        _ = html
+        profile = dict(fake_profile_dict)
         profile["isin"] = isin
         return profile
 
@@ -219,13 +239,13 @@ def test_run_batch_logs_error_and_continues(
     assert snapshot_path.exists()
 
     # One ok, one err
-    progress_lines = (
+    progress_lines: List[str] = (
         (tmp_path / "profiles" / "runs" / "errrun" / "progress.jsonl")
         .read_text(encoding="utf-8")
         .strip()
         .splitlines()
     )
-    statuses = [json.loads(line)["status"] for line in progress_lines]
+    statuses: list[str] = [json.loads(line)["status"] for line in progress_lines]
     assert statuses.count("ok") == 1
     assert statuses.count("err") == 1
 
@@ -237,25 +257,31 @@ def test_run_batch_logs_error_and_continues(
 def test_run_batch_respects_run_id(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    fake_profile_dict: dict[str, str],
+    fake_profile_dict: dict[str, Any],
     fake_io_response: object,
 ) -> None:
     """Custom run_id should be used as the runs/ subdirectory name."""
-    cfg: dict[str, Any] = {}
-    index_entries = [{"isin": "IE00AAA11111", "url": "http://dummy/etf1"}]
+    cfg: MXMConfig = cast(MXMConfig, {})
+    index_entries: list[dict[str, str]] = [
+        {"isin": "IE00AAA11111", "url": "http://dummy/etf1"}
+    ]
 
-    def fake_get_profile_index(cfg_arg: dict[str, Any], base_path: Path, **_: Any):
+    def fake_get_profile_index(
+        cfg_arg: MXMConfig, base_path: Path, **_: Any
+    ) -> list[dict[str, str]]:
         assert cfg_arg is cfg
         return index_entries
 
     def fake_download_html(
-        cfg_arg: dict[str, Any], isin: str, url: str, timeout: int = 30
-    ) -> str:
+        cfg_arg: MXMConfig, isin: str, url: str, timeout: int = 30
+    ) -> Tuple[str, object]:
         assert cfg_arg is cfg
+        _ = (isin, url, timeout)
         return ("<html>dummy</html>", fake_io_response)
 
-    def fake_parse_profile(html: str, isin: str):
-        profile = fake_profile_dict.copy()
+    def fake_parse_profile(html: str, isin: str) -> dict[str, Any]:
+        _ = html
+        profile = dict(fake_profile_dict)
         profile["isin"] = isin
         return profile
 

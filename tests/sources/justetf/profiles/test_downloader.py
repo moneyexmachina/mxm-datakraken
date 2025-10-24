@@ -7,9 +7,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 from types import SimpleNamespace, TracebackType
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Tuple, Type, cast
 
 import pytest
+from mxm_config import MXMConfig
 
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
 
@@ -20,9 +21,9 @@ class _DummyIoResponse:
     """Minimal stand-in for mxm_dataio.models.Response."""
 
     def __init__(self, path: Path) -> None:
-        self.path = str(path)
-        self._bytes = path.read_bytes()
-        self.checksum = hashlib.sha256(self._bytes).hexdigest()
+        self.path: str = str(path)
+        self._bytes: bytes = path.read_bytes()
+        self.checksum: str = hashlib.sha256(self._bytes).hexdigest()
 
     def verify(self, data: bytes) -> bool:
         return hashlib.sha256(data).hexdigest() == self.checksum
@@ -34,11 +35,11 @@ class _DummyIo:
     def __init__(
         self,
         *,
-        payload_path: Path | None = None,
-        raise_on_fetch: Exception | None = None,
+        payload_path: Optional[Path] = None,
+        raise_on_fetch: Optional[Exception] = None,
     ) -> None:
-        self._payload_path = payload_path
-        self._raise = raise_on_fetch
+        self._payload_path: Optional[Path] = payload_path
+        self._raise: Optional[Exception] = raise_on_fetch
         self.requests: list[Any] = []
 
     def __enter__(self) -> "_DummyIo":
@@ -50,10 +51,7 @@ class _DummyIo:
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> None:
-        """Finalize the Session by setting ended_at."""
-
         _ = (exc_type, exc_val, exc_tb)
-
         return None
 
     def request(self, kind: str, params: dict[str, Any]) -> SimpleNamespace:
@@ -85,19 +83,26 @@ def test_download_etf_profile_html_success(
 
     dummy_io = _DummyIo(payload_path=payload_path)
 
+    # Typed helpers instead of lambdas (quiet Pyright)
+    def _patched_dataio_session(*args: Any, **kwargs: Any) -> _DummyIo:
+        return dummy_io
+
+    def _patched_dataio_for_justetf(_cfg: Any) -> Tuple[str, Dict[str, Any]]:
+        return ("http", {})
+
     # Patch the DataIoSession and alias resolver inside the downloader module
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profiles.downloader.DataIoSession",
-        lambda source, cfg, use_cache=True: dummy_io,  # noqa: ARG005
+        _patched_dataio_session,
+        raising=True,
     )
-
-    # Patch the config helper to return (alias, dio_cfg)
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profiles.downloader.dataio_for_justetf",
-        lambda cfg: ("http", {}),
+        _patched_dataio_for_justetf,
+        raising=True,
     )
 
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
     html, _ = download_etf_profile_html(
         cfg, "TEST123", "https://example.test/etf-profile.html?isin=TEST123"
     )
@@ -109,16 +114,24 @@ def test_download_etf_profile_html_failure(monkeypatch: pytest.MonkeyPatch) -> N
     # Simulate adapter/network failure by raising from fetch()
     dummy_io = _DummyIo(raise_on_fetch=RuntimeError("network down"))
 
+    def _patched_dataio_session(*args: Any, **kwargs: Any) -> _DummyIo:
+        return dummy_io
+
+    def _patched_dataio_for_justetf(_cfg: Any) -> Tuple[str, Dict[str, Any]]:
+        return ("http", {})
+
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profiles.downloader.DataIoSession",
-        lambda source, cfg, use_cache=True: dummy_io,  # noqa: ARG005
+        _patched_dataio_session,
+        raising=True,
     )
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profiles.downloader.dataio_for_justetf",
-        lambda cfg: ("http", {}),  # noqa: ARG005
+        _patched_dataio_for_justetf,
+        raising=True,
     )
 
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
     with pytest.raises(RuntimeError):
         _ = download_etf_profile_html(
             cfg, "TEST123", "https://example.test/etf-profile.html?isin=TEST123"

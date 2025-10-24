@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "mxm-datakraken"
-version = "0.1.2"
-description = "MXM data ingestion and collection package – scrapers and connectors for external data sources."
+version = "0.2.0"
+description = "Data-collection and scraping framework for Money ex Machina."
 authors = ["mxm <contact@moneyexmachina.com>"]
 license = "MIT"
 readme = "README.md"
@@ -10,8 +10,8 @@ readme = "README.md"
 python = "^3.13"
 requests = ">=2.32.5,<3.0.0"
 bs4 = ">=0.0.2,<0.0.3"
-mxm-config = { git = "https://github.com/moneyexmachina/mxm-config.git", rev="cd2d4066f28a49b992be111b51e44e0ed70c3f0f" }
-mxm-dataio = { git = "https://github.com/moneyexmachina/mxm-dataio.git", rev="fa70838fdcf31582a63880332fe711956b652eab" }
+mxm-config = ">=0.3.0"
+mxm-dataio = ">=0.2.2"
 rich = "^14.1.0"
 
 [build-system]
@@ -24,7 +24,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py313"
 # Select rulesets; expand gradually if desired
 select = ["E", "F", "B", "ANN"]
 ignore = ["ANN101", "ANN102"]
@@ -34,7 +34,7 @@ exclude = ["build", "dist", ".venv"]
 
 [tool.black]
 line-length = 88
-target-version = ["py312"]
+target-version = ["py313"]
 
 [tool.isort]
 profile = "black"
@@ -42,10 +42,10 @@ line_length = 88
 combine_as_imports = true
 
 [tool.pyright]
-typeCheckingMode = "strict"            # or "strict" if you want more enforcement
+typeCheckingMode = "strict"
 include = ["mxm_datakraken"]
 exclude = ["build", "dist", "docs", ".venv"]
-pythonVersion = "3.12"
+pythonVersion = "3.13"
 pythonPlatform = "All"
 reportMissingImports = "error"
 reportMissingTypeStubs = "warning"
@@ -56,6 +56,7 @@ black = "^25.9.0"
 ruff = "^0.13.2"
 pytest = "^8.4.2"
 ipython = "^9.6.0"
+pyright = "^1.1.406"
 
 
 [tool.pytest.ini_options]

@@ -1,6 +1,13 @@
-default:
-  mxm_datakraken: {}
+default: {}
 
 research:
-  mxm_datakraken:
-    paths.sources.justetf.parsed_dir: ${mxm_datakraken.paths.sources.justetf.root}/parsed_research
+  sources:
+    justetf:
+      # Use a separate parsed directory for research runs
+      parsed_dir: ${sources.justetf.root}/parsed_research
+
+      # (Optional) keep DataIO artefacts separate too
+      dataio:
+        paths:
+          responses_dir: ${sources.justetf.root}/responses_research
+          db_path: ${sources.justetf.root}/dataio_research.sqlite  # uncomment if desired

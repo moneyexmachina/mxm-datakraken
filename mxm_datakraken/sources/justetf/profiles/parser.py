@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from typing import cast
 
 from bs4 import BeautifulSoup, Tag
 
@@ -32,12 +33,12 @@ def parse_profile(
     Returns:
         A JustETFProfile dictionary with parsed fields.
     """
-    soup = BeautifulSoup(html, "html.parser")
+    soup: BeautifulSoup = BeautifulSoup(html, "html.parser")
 
-    name = extract_name(soup)
-    description = extract_description(soup)
-    data = extract_data_table(soup)
-    listings = extract_listings(soup)
+    name: str = extract_name(soup)
+    description: str = extract_description(soup)
+    data: dict[str, str] = extract_data_table(soup)
+    listings: list[dict[str, str]] = extract_listings(soup)
 
     profile: JustETFProfile = {
         "isin": isin,
@@ -48,7 +49,6 @@ def parse_profile(
         "source_url": source_url or "",
         "last_fetched": datetime.now(timezone.utc).isoformat(),
     }
-
     return profile
 
 
@@ -73,21 +73,22 @@ def extract_description(soup: BeautifulSoup) -> str:
     Returns:
         A cleaned string containing the description.
     """
-    desc_container = soup.find("div", id="etf-description-content")
+    desc_container: Tag | None = soup.find("div", id="etf-description-content")
     if not desc_container:
         return ""
 
     # Collect text fragments while skipping separators
     parts: list[str] = []
-    for child in desc_container.find_all("div", recursive=False):
-        text = child.get_text(" ", strip=True)
+    # Narrow the type of find_all result to a list[Tag]
+    for child in cast(list[Tag], desc_container.find_all("div", recursive=False)):
+        text: str = child.get_text(" ", strip=True)
         if text:
             parts.append(text)
 
-    raw = " ".join(parts)
+    raw: str = " ".join(parts)
 
     # Normalize whitespace
-    cleaned = re.sub(r"\s+", " ", raw)
+    cleaned: str = re.sub(r"\s+", " ", raw)
 
     # Remove spaces before punctuation like ". , ; :"
     cleaned = re.sub(r"\s+([.,;:])", r"\1", cleaned)
@@ -103,69 +104,73 @@ def extract_data_table(soup: BeautifulSoup) -> dict[str, str]:
     """
     data: dict[str, str] = {}
 
-    table = soup.find("table", class_="etf-data-table")
+    table: Tag | None = soup.find("table", class_="etf-data-table")
     if not table:
         return data
 
-    for row in table.find_all("tr"):
-        label_cell = row.find("td", class_="vallabel")
-        value_cell = None
+    for row in cast(list[Tag], table.find_all("tr")):
+        label_cell: Tag | None = row.find("td", class_="vallabel")
+        value_cell: Tag | None = None
+
         if label_cell:
-            # find the sibling cell (second <td>)
-            siblings = row.find_all("td")
+            siblings: list[Tag] = cast(list[Tag], row.find_all("td"))
             if len(siblings) > 1:
                 value_cell = siblings[1]
 
         if not label_cell or not value_cell:
             continue
 
-        key = label_cell.get_text(" ", strip=True)
+        key: str = label_cell.get_text(" ", strip=True)
 
         # values may be nested in <div class="val">, <span class="val2">, etc.
-        vals = []
+        vals: list[str] = []
         for cls in ["val", "val2"]:
-            for el in value_cell.find_all(class_=cls):
+            for el in cast(list[Tag], value_cell.find_all(class_=cls)):
                 vals.append(el.get_text(" ", strip=True))
 
         # fallback: if no val/val2, take raw text
         if not vals:
             vals.append(value_cell.get_text(" ", strip=True))
 
-        value = " ".join(v for v in vals if v)
+        # Join a typed list (avoid generator-of-Unknown complaints)
+        non_empty: list[str] = [v for v in vals if v]
+        value: str = " ".join(non_empty)
         data[key] = value
 
     return data
 
 
-def extract_listings(soup) -> list[dict[str, str]]:
+def extract_listings(soup: BeautifulSoup) -> list[dict[str, str]]:
     """
     Extract ETF listings from the 'Stock exchange' section.
     Robust against other mobile-table uses (e.g. dividends).
     """
-    listings = []
+    listings: list[dict[str, str]] = []
 
-    # 1️⃣ Find the section anchored by id="stock-exchange"
-    stock_anchor = soup.select_one("div#stock-exchange")
+    # 1️⃣Find the section anchored by id="stock-exchange"
+    stock_anchor: Tag | None = soup.select_one("div#stock-exchange")
     if not stock_anchor:
         return listings
 
-    # 2️⃣ Find the nearest following table after the anchor
-    table = stock_anchor.find_next("table", class_="mobile-table")
+    # 2️⃣Find the nearest following table after the anchor
+    table: Tag | None = stock_anchor.find_next("table", class_="mobile-table")
     if not table:
         return listings
 
-    # 3️⃣ Extract headers
-    headers = [th.get_text(strip=True) for th in table.select("thead th")]
+    # 3️⃣Extract headers
+    th_tags: list[Tag] = cast(list[Tag], table.select("thead th"))
+    headers: list[str] = [th.get_text(strip=True) for th in th_tags]
     # Normalize: collapse duplicate spaces and unify capitalization
     headers = [h.replace("\xa0", " ").strip() for h in headers]
 
-    # 4️⃣ Extract rows
-    for tr in table.select("tbody tr"):
-        cells = [td.get_text(strip=True) for td in tr.select("td")]
+    # 4️⃣Extract rows
+    for tr in cast(list[Tag], table.select("tbody tr")):
+        td_tags: list[Tag] = cast(list[Tag], tr.select("td"))
+        cells: list[str] = [td.get_text(strip=True) for td in td_tags]
         if len(cells) != len(headers):
             # Sometimes rowspan/colspan causes mismatch — skip partial rows
             continue
-        row = dict(zip(headers, cells))
+        row: dict[str, str] = dict(zip(headers, cells))
         listings.append(row)
 
     return listings

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -17,6 +18,7 @@ from mxm_datakraken.sources.justetf.profiles.persistence import (
 def sample_profile() -> JustETFProfile:
     return {
         "isin": "TEST123",
+        "source_url": "https://example.com/en/etf-profile.html?isin=TEST123",
         "name": "Test ETF",
         "data": {"Index": "Test Index"},
         "description": "A sample ETF profile.",
@@ -24,7 +26,7 @@ def sample_profile() -> JustETFProfile:
 
 
 def test_save_profile_writes_file(
-    tmp_path: Path, sample_profile: dict[str, str]
+    tmp_path: Path, sample_profile: JustETFProfile
 ) -> None:
     """Ensure save_profile writes a file named after ISIN."""
     path: Path = save_profile(sample_profile, tmp_path)
@@ -38,15 +40,19 @@ def test_save_profile_writes_file(
 
 def test_save_profile_missing_isin(tmp_path: Path) -> None:
     """Ensure save_profile raises ValueError if no ISIN."""
-    bad_profile: dict[str, str] = {"name": "No ISIN"}
+    # Deliberately omit required 'isin'; cast to satisfy TypedDict static typing.
+    bad_profile: dict[str, Any] = {
+        "name": "No ISIN",
+        "source_url": "https://example.com/en/etf-profile.html?isin=NOPE",
+    }
     with pytest.raises(ValueError):
-        save_profile(bad_profile, tmp_path)
+        _ = save_profile(cast(JustETFProfile, bad_profile), tmp_path)
 
 
-def test_save_profiles_snapshot(tmp_path: Path, sample_profile: dict[str, str]) -> None:
+def test_save_profiles_snapshot(tmp_path: Path, sample_profile: JustETFProfile) -> None:
     """Ensure snapshot writes dated and latest files."""
     snapshot_date: date = date(2025, 10, 1)
-    profiles = [sample_profile]
+    profiles: list[JustETFProfile] = [sample_profile]
 
     filepath: Path = save_profiles_snapshot(profiles, tmp_path, as_of=snapshot_date)
 

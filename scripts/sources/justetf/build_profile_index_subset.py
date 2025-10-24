@@ -20,11 +20,12 @@ import argparse
 import json
 from datetime import date
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Sequence
 
-from mxm_config import load_config  # returns an OmegaConf DictConfig
+from mxm_config import load_config
 
 from mxm_datakraken.bootstrap import register_adapters_from_config
+from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
 
 
@@ -40,16 +41,16 @@ def read_universe_file(universe_path: Path) -> list[str]:
 
 
 def filter_index_by_isins(
-    index: Iterable[dict[str, Any]], isins: Iterable[str]
-) -> list[dict[str, Any]]:
+    index: Sequence[ETFProfileIndexEntry], isins: Sequence[str]
+) -> list[ETFProfileIndexEntry]:
     """Return only entries whose ISIN is in the provided list."""
     isins_set = set(isins)
     subset = [entry for entry in index if entry.get("isin") in isins_set]
-    print(f"Filtered {len(subset)} of {len(list(index))} total entries.")
+    print(f"Filtered {len(subset)} of {len(index)} total entries.")
     return subset
 
 
-def save_subset_index(subset: list[dict[str, Any]], base_path: Path) -> Path:
+def save_subset_index(subset: Sequence[ETFProfileIndexEntry], base_path: Path) -> Path:
     """Save the filtered subset as both dated and latest snapshots."""
     subset_dir = base_path / "profile_index"
     subset_dir.mkdir(parents=True, exist_ok=True)
@@ -58,15 +59,16 @@ def save_subset_index(subset: list[dict[str, Any]], base_path: Path) -> Path:
     dated_path = subset_dir / f"profile_index_subset_{today.isoformat()}.json"
     latest_path = subset_dir / "subset_latest.json"
 
-    for p in (dated_path, latest_path):
-        p.write_text(json.dumps(subset, ensure_ascii=False, indent=2), encoding="utf-8")
+    payload = json.dumps(list(subset), ensure_ascii=False, indent=2)
+    dated_path.write_text(payload, encoding="utf-8")
+    latest_path.write_text(payload, encoding="utf-8")
 
     print(f"Saved subset snapshot to:\n  - {dated_path}\n  - {latest_path}")
     return latest_path
 
 
 def main(
-    force_refresh: bool = False, env: str | None = None, profile: str | None = None
+    *, force_refresh: bool = False, env: str = "dev", profile: str = "default"
 ) -> None:
     """Main entry point for building a subset profile index."""
     # 1) Load config and register adapters (DataIO)
@@ -81,8 +83,10 @@ def main(
     isins = read_universe_file(universe_path)
     print(f"Loaded {len(isins)} ISINs from universe file.")
 
-    # 4) Get or build the full profile index (persisting + provenance happens inside API)
-    index = get_profile_index(cfg=cfg, base_path=base_path, force_refresh=force_refresh)
+    # 4) Get or build the full profile index
+    index: list[ETFProfileIndexEntry] = get_profile_index(
+        cfg=cfg, base_path=base_path, force_refresh=force_refresh
+    )
     print(f"Profile index contains {len(index)} total entries.")
 
     # 5) Filter and save subset
@@ -108,4 +112,9 @@ if __name__ == "__main__":
         "--profile", default=None, help="mxm-config profile override (optional)."
     )
     args = parser.parse_args()
-    main(force_refresh=args.force_refresh, env=args.env, profile=args.profile)
+    # Provide defaults so we never pass Optional[str] to load_config
+    main(
+        force_refresh=bool(args.force_refresh),
+        env=args.env or "dev",
+        profile=args.profile or "default",
+    )

@@ -8,12 +8,13 @@ import datetime as dt
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Tuple, cast
 
 import pytest
+from mxm_config import MXMConfig
 
+from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
 from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
-from mxm_datakraken.sources.justetf.profile_index.discover import ETFProfileIndexEntry
 from mxm_datakraken.sources.justetf.profile_index.persistence import save_profile_index
 
 
@@ -34,9 +35,9 @@ def test_get_profile_index_first_run(
     fake_index: list[ETFProfileIndexEntry],
 ) -> None:
     """On first run with no cache, should build index and save results."""
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})  # patched build ignores cfg
 
-    def _fake_resp(tmp_path: Path):
+    def _fake_resp(tmp_path: Path) -> SimpleNamespace:
         payload = tmp_path / "sitemap.bin"
         payload.write_bytes(b"<xml/>")
         return SimpleNamespace(
@@ -47,15 +48,20 @@ def test_get_profile_index_first_run(
             sequence=None,
             size_bytes=payload.stat().st_size,
             created_at=dt.datetime.now(dt.timezone.utc),
-            verify=lambda b: True,
+            verify=lambda _: True,  # type: ignore[no-any-return]
         )
 
-    def fake_build(*args: Any, **kwargs: Any):
+    def fake_build(
+        *_args: Any, **_kwargs: Any
+    ) -> Tuple[list[ETFProfileIndexEntry], SimpleNamespace]:
+        _ = _args
+        _ = _kwargs
         return fake_index, _fake_resp(tmp_path)
 
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profile_index.api.build_profile_index",
         fake_build,
+        raising=True,
     )
 
     results: list[ETFProfileIndexEntry] = get_profile_index(cfg, tmp_path)
@@ -72,11 +78,11 @@ def test_get_profile_index_force_refresh(
     fake_index: list[ETFProfileIndexEntry],
 ) -> None:
     """With force_refresh=True, should always rebuild index."""
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
 
     calls: dict[str, int] = {"count": 0}
 
-    def _fake_resp(tmp_path: Path):
+    def _fake_resp(tmp_path: Path) -> SimpleNamespace:
         payload = tmp_path / "sitemap.bin"
         payload.write_bytes(b"<xml/>")
         return SimpleNamespace(
@@ -87,17 +93,21 @@ def test_get_profile_index_force_refresh(
             sequence=None,
             size_bytes=payload.stat().st_size,
             created_at=dt.datetime.now(dt.timezone.utc),
-            verify=lambda b: True,
+            verify=lambda _: True,  # type: ignore[no-any-return]
         )
 
-    def fake_build(*args: Any, **kwargs: Any):
+    def fake_build(
+        *_args: Any, **_kwargs: Any
+    ) -> Tuple[list[ETFProfileIndexEntry], SimpleNamespace]:
         calls["count"] += 1
-
+        _ = _args
+        _ = _kwargs
         return fake_index, _fake_resp(tmp_path)
 
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profile_index.api.build_profile_index",
         fake_build,
+        raising=True,
     )
 
     # Call twice with force_refresh=True
@@ -113,9 +123,9 @@ def test_get_profile_index_as_of(
     fake_index: list[ETFProfileIndexEntry],
 ) -> None:
     """With as_of set, should return the closest snapshot <= that date."""
-    cfg: dict[str, Any] = {}
+    cfg: MXMConfig = cast(MXMConfig, {})
 
-    def _fake_resp(tmp_path: Path):
+    def _fake_resp(tmp_path: Path) -> SimpleNamespace:
         payload = tmp_path / "sitemap.bin"
         payload.write_bytes(b"<xml/>")
         return SimpleNamespace(
@@ -126,15 +136,20 @@ def test_get_profile_index_as_of(
             sequence=None,
             size_bytes=payload.stat().st_size,
             created_at=dt.datetime.now(dt.timezone.utc),
-            verify=lambda b: True,
+            verify=lambda _: True,  # type: ignore[no-any-return]
         )
 
-    def fake_build(*args: Any, **kwargs: Any):
+    def fake_build(
+        *_args: Any, **_kwargs: Any
+    ) -> Tuple[list[ETFProfileIndexEntry], SimpleNamespace]:
+        _ = _args
+        _ = _kwargs
         return fake_index, _fake_resp(tmp_path)
 
     monkeypatch.setattr(
         "mxm_datakraken.sources.justetf.profile_index.api.build_profile_index",
         fake_build,
+        raising=True,
     )
 
     # Save two snapshots manually

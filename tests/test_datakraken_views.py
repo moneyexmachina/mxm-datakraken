@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Dict, cast
+from typing import Callable, cast
 
 import pytest
 from mxm_config import load_config
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from omegaconf.errors import ReadonlyConfigError
 
 from mxm_datakraken.config.config import (
-    datakraken_view,
     justetf_dataio_view,
-    justetf_http_view,
-    justetf_paths_view,
+    justetf_http_adapter_view,
+    justetf_view,
 )
 
 
@@ -25,38 +24,17 @@ def _load_cfg_from_repo_yaml(
     # Mirror mxm_datakraken/config/*.yaml into MXM_CONFIG_HOME/mxm-datakraken/
     mxm_config_home("mxm-datakraken", "mxm_datakraken")
     cfg = cast(
-        DictConfig,
-        load_config(package="mxm-datakraken", env=env, profile=profile),
+        DictConfig, load_config(package="mxm-datakraken", env=env, profile=profile)
     )
     assert isinstance(cfg, DictConfig)
     return cfg
 
 
-def test_datakraken_view_mapping_readonly_and_identity(
+def test_justetf_view_has_core_paths_and_is_readonly(
     mxm_config_home: Callable[[str, str], Path],
 ) -> None:
-    cfg = _load_cfg_from_repo_yaml(mxm_config_home)
-
-    view = cast(DictConfig, datakraken_view(cfg))  # resolve=True by default
-    assert isinstance(view, DictConfig)
-
-    # The view should be the same underlying subtree (no deep copy).
-    assert view is cfg.mxm_datakraken  # type: ignore[attr-defined]
-
-    # Basic expected subtrees present
-    for key in ("paths", "sources"):
-        assert key in view
-
-    # Read-only enforced
-    with pytest.raises(ReadonlyConfigError):
-        view.paths.root = "/tmp/override"  # type: ignore[attr-defined]
-
-
-def test_justetf_paths_view_has_core_paths_and_is_readonly(
-    mxm_config_home: Callable[[str, str], Path],
-) -> None:
-    cfg = _load_cfg_from_repo_yaml(mxm_config_home)
-    pview = cast(DictConfig, justetf_paths_view(cfg))  # resolved
+    cfg = _load_cfg_from_repo_yaml(mxm_config_home, env="dev", profile="default")
+    view = cast(DictConfig, justetf_view(cfg))  # resolve=True by default
 
     # Core keys exist and are non-empty strings
     required_top = (
@@ -67,101 +45,93 @@ def test_justetf_paths_view_has_core_paths_and_is_readonly(
         "logs_dir",
     )
     for key in required_top:
-        assert key in pview
-        val = pview[key]
+        assert key in view
+        val = view[key]
         assert isinstance(val, str) and len(val) > 0
 
-    # Nested dataio paths
-    assert "dataio" in pview
-    assert isinstance(pview.dataio.db_path, str)  # type: ignore[attr-defined]
-    assert isinstance(pview.dataio.responses_dir, str)  # type: ignore[attr-defined]
+    # Nested dataio paths present
+    assert "dataio" in view
+    assert isinstance(view.dataio.paths.root, str)  # type: ignore[attr-defined]
+    assert isinstance(view.dataio.paths.db_path, str)  # type: ignore[attr-defined]
+    assert isinstance(view.dataio.paths.responses_dir, str)  # type: ignore[attr-defined]
 
     # Composition includes env/profile suffixes (sanity)
-    assert "/dev/datakraken/default" in pview.root  # type: ignore[attr-defined]
-    assert pview.root.endswith("/sources/justetf")  # type: ignore[attr-defined]
-    assert pview.parsed_dir.endswith("/sources/justetf/parsed")  # type: ignore[attr-defined]
+    assert "/dev/datakraken/default" in view.root  # type: ignore[attr-defined]
+    assert view.root.endswith("/sources/justetf")  # type: ignore[attr-defined]
+    assert view.parsed_dir.endswith("/sources/justetf/parsed")  # type: ignore[attr-defined]
 
     # Read-only enforced
     with pytest.raises(ReadonlyConfigError):
-        pview.db_path = "/tmp/x.sqlite"  # type: ignore[attr-defined]
+        view.root = "/tmp/override"  # type: ignore[attr-defined]
 
 
-def test_justetf_http_view_defaults_env_override_and_copy_safety(
+def test_justetf_dataio_view_paths_and_env_cache(
     mxm_config_home: Callable[[str, str], Path],
 ) -> None:
     cfg_dev = _load_cfg_from_repo_yaml(mxm_config_home, env="dev", profile="default")
     cfg_prod = _load_cfg_from_repo_yaml(mxm_config_home, env="prod", profile="default")
 
-    hview_dev = cast(DictConfig, justetf_http_view(cfg_dev))  # resolved
-    hview_prod = cast(DictConfig, justetf_http_view(cfg_prod))  # resolved
+    dview_dev = cast(DictConfig, justetf_dataio_view(cfg_dev))
+    dview_prod = cast(DictConfig, justetf_dataio_view(cfg_prod))
 
-    # Expected knobs exist with sensible types
-    assert str(hview_dev.base_url) == "https://www.justetf.com"  # type: ignore[attr-defined]
-    assert isinstance(hview_dev.timeout_s, (int, float))  # type: ignore[attr-defined]
-    assert isinstance(hview_dev.verify_ssl, bool)  # type: ignore[attr-defined]
-    assert "headers" in hview_dev and "retries" in hview_dev
-
-    # Environment override for politeness_ms
-    assert int(hview_dev.politeness_ms) == 1200  # type: ignore[attr-defined]
-    assert int(hview_prod.politeness_ms) == 1500  # type: ignore[attr-defined]
-
-    # Vendor-inherited retries structure
-    retries = cast(
-        Dict[str, Any], OmegaConf.to_container(hview_dev.retries, resolve=True)
+    # Paths exist
+    assert isinstance(dview_dev.paths.root, str) and dview_dev.paths.root  # type: ignore[attr-defined]
+    assert isinstance(dview_dev.paths.db_path, str) and dview_dev.paths.db_path  # type: ignore[attr-defined]
+    assert (
+        isinstance(dview_dev.paths.responses_dir, str) and dview_dev.paths.responses_dir
     )  # type: ignore[attr-defined]
-    assert retries.get("max_attempts") == 3
-    assert retries.get("backoff_ms") == [500, 1000, 2000]
 
-    # Converting to a dict allows local mutation without affecting cfg
-    params = cast(Dict[str, Any], OmegaConf.to_container(hview_dev, resolve=True))
-    old_timeout = params.get("timeout_s")
-    params["timeout_s"] = 999  # local change
-
-    hview_dev2 = cast(DictConfig, justetf_http_view(cfg_dev))
-    assert hview_dev2.timeout_s == old_timeout  # type: ignore[attr-defined]
-
-    # Read-only enforced on the view itself
-    with pytest.raises(ReadonlyConfigError):
-        hview_dev.timeout_s = 999  # type: ignore[attr-defined]
-
-
-def test_justetf_dataio_view_policy_and_copy_safety(
-    mxm_config_home: Callable[[str, str], Path],
-) -> None:
-    cfg = _load_cfg_from_repo_yaml(mxm_config_home)
-    dview = cast(DictConfig, justetf_dataio_view(cfg))  # resolved
-
-    # Serialization block
-    assert str(dview.serialization.response_format) == "raw"  # type: ignore[attr-defined]
-    assert str(dview.serialization.compression) == "none"  # type: ignore[attr-defined]
-    assert str(dview.serialization.hash_algo) == "sha256"  # type: ignore[attr-defined]
-
-    # Audit block
-    audit = cast(Dict[str, Any], OmegaConf.to_container(dview.audit, resolve=True))
-    assert audit.get("record_request") is True
-    assert audit.get("record_response") is True
-    assert "Authorization" in (audit.get("redact_headers") or [])
-
-    # Cache block
-    cache = cast(Dict[str, Any], OmegaConf.to_container(dview.cache, resolve=True))
-    assert cache.get("use_cache") is True
-    assert cache.get("write_cache") is True
-    assert cache.get("force_refresh") is False
-
-    # Dict conversion is copy-safe
-    dopts = cast(Dict[str, Any], OmegaConf.to_container(dview, resolve=True))
-    dopts["serialization"] = {**dopts["serialization"], "response_format": "json"}
-    dview2 = cast(DictConfig, justetf_dataio_view(cfg))
-    assert str(dview2.serialization.response_format) == "raw"  # type: ignore[attr-defined]
+    # Env override for cache.use_cache (dev True, prod False)
+    # If you didn't set env overrides, relax these assertions.
+    assert bool(getattr(getattr(dview_dev, "cache", {}), "use_cache", True)) is True  # type: ignore[attr-defined]
+    assert bool(getattr(getattr(dview_prod, "cache", {}), "use_cache", True)) is False  # type: ignore[attr-defined]
 
     # Read-only enforced
     with pytest.raises(ReadonlyConfigError):
-        dview.cache.use_cache = False  # type: ignore[attr-defined]
+        dview_dev.paths.db_path = "/tmp/x.sqlite"  # type: ignore[attr-defined]
 
 
 def test_profile_overlay_changes_paths_for_research(
     mxm_config_home: Callable[[str, str], Path],
 ) -> None:
     cfg = _load_cfg_from_repo_yaml(mxm_config_home, env="dev", profile="research")
-    pview = cast(DictConfig, justetf_paths_view(cfg))
+    pview = cast(DictConfig, justetf_view(cfg))
+    # From profile.yaml override: parsed_dir → parsed_research
     assert pview.parsed_dir.endswith("/sources/justetf/parsed_research")  # type: ignore[attr-defined]
+
+
+def test_justetf_http_adapter_view_defaults_and_readonly(
+    mxm_config_home: Callable[[str, str], Path],
+) -> None:
+    cfg = _load_cfg_from_repo_yaml(mxm_config_home, env="dev", profile="default")
+
+    # View should exist and be read-only
+    aview = cast(DictConfig, justetf_http_adapter_view(cfg))  # resolve=True by default
+    assert isinstance(aview, DictConfig)
+
+    # Core fields exist with sane types
+    assert "enabled" in aview
+    assert isinstance(aview.enabled, bool)  # type: ignore[attr-defined]
+
+    assert "alias" in aview
+    assert isinstance(aview.alias, str) and len(aview.alias) > 0  # type: ignore[attr-defined]
+
+    assert "user_agent" in aview
+    assert isinstance(aview.user_agent, str) and "mxm-datakraken" in aview.user_agent  # type: ignore[attr-defined]
+
+    assert "default_timeout" in aview
+    assert (
+        isinstance(aview.default_timeout, (int, float))
+        and float(aview.default_timeout) > 0.0
+    )  # type: ignore[attr-defined]
+
+    # Headers (if configured) should be a mapping with string values
+    headers = getattr(aview, "default_headers", None)  # type: ignore[attr-defined]
+    if headers is not None:
+        # OmegaConf allows both dot and item access; use item access for keys like "Accept"
+        assert "Accept" in headers
+        assert isinstance(headers["Accept"], str)
+
+    # Read-only enforced
+    with pytest.raises(ReadonlyConfigError):
+        aview.alias = "override-me"  # type: ignore[attr-defined]
