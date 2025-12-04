@@ -6,8 +6,8 @@ from typing import Mapping, NoReturn, Optional, cast
 import pytest
 from mxm_config import MXMConfig
 
-from mxm_datakraken.bootstrap import register_adapters_from_config
-from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
+from mxm.datakraken.bootstrap import register_adapters_from_config
+from mxm.datakraken.common.http_adapter import HttpRequestsAdapter
 
 # ---------- helpers -----------------------------------------------------------
 
@@ -64,10 +64,10 @@ def test_register_from_view_registers(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.register", _patch_register, raising=True
+        "mxm.datakraken.bootstrap.register", _patch_register, raising=True
     )
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.justetf_http_adapter_view", _patch_view, raising=True
+        "mxm.datakraken.bootstrap.justetf_http_adapter_view", _patch_view, raising=True
     )
 
     cfg = _cfg_stub()
@@ -94,10 +94,10 @@ def test_register_disabled_does_nothing(monkeypatch: pytest.MonkeyPatch) -> None
         return _node(enabled=False)
 
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.register", _patch_register, raising=True
+        "mxm.datakraken.bootstrap.register", _patch_register, raising=True
     )
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.justetf_http_adapter_view", _patch_view, raising=True
+        "mxm.datakraken.bootstrap.justetf_http_adapter_view", _patch_view, raising=True
     )
 
     cfg = _cfg_stub()
@@ -117,9 +117,9 @@ def test_register_swallows_registry_errors(monkeypatch: pytest.MonkeyPatch) -> N
         _ = resolve
         return _node()
 
-    monkeypatch.setattr("mxm_datakraken.bootstrap.register", _boom, raising=True)
+    monkeypatch.setattr("mxm.datakraken.bootstrap.register", _boom, raising=True)
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.justetf_http_adapter_view", _patch_view, raising=True
+        "mxm.datakraken.bootstrap.justetf_http_adapter_view", _patch_view, raising=True
     )
 
     cfg = _cfg_stub()
@@ -140,10 +140,10 @@ def test_missing_adapter_node_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
         raise AttributeError("no node")
 
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.register", _patch_register, raising=True
+        "mxm.datakraken.bootstrap.register", _patch_register, raising=True
     )
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.justetf_http_adapter_view", _raise_view, raising=True
+        "mxm.datakraken.bootstrap.justetf_http_adapter_view", _raise_view, raising=True
     )
 
     cfg = _cfg_stub()
@@ -173,10 +173,10 @@ def test_register_strict_raises_on_missing_http_node(
         pytest.fail("register() was called despite strict mode and missing node")
 
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.justetf_http_adapter_view", _raise_view, raising=True
+        "mxm.datakraken.bootstrap.justetf_http_adapter_view", _raise_view, raising=True
     )
     monkeypatch.setattr(
-        "mxm_datakraken.bootstrap.register", _should_not_be_called, raising=True
+        "mxm.datakraken.bootstrap.register", _should_not_be_called, raising=True
     )
 
     cfg = _cfg_stub()  # If you don't have this helper, see below for a fallback.

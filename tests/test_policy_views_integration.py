@@ -10,7 +10,7 @@ from mxm_dataio.api import CacheMode
 from omegaconf import DictConfig
 from omegaconf.errors import ReadonlyConfigError
 
-from mxm_datakraken.config.config import (
+from mxm.datakraken.config.config import (
     justetf_policy_view,
     load_justetf_policy,
 )
@@ -22,7 +22,7 @@ def _load_cfg_from_repo_yaml(
     env: str = "dev",
     profile: str = "default",
 ) -> DictConfig:
-    mxm_config_home("mxm-datakraken", "mxm_datakraken")
+    mxm_config_home("mxm-datakraken", "mxm.datakraken")
     cfg = cast(
         DictConfig, load_config(package="mxm-datakraken", env=env, profile=profile)
     )

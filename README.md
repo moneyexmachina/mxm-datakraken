@@ -38,7 +38,7 @@ External Source -> mxm-datakraken -> raw JSON/CSV
 ## Project Structure
 
 ```
-./mxm_datakraken/
+./src/mxm/datakraken/
     sources/
         justetf/      # ETF scraper
         hl/           # Broker positions connector

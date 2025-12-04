@@ -13,7 +13,7 @@ from mxm_config import MXMConfig
 from mxm_dataio.models import Response as IoResponse
 from mxm_dataio.types import RequestParams
 
-from mxm_datakraken.sources.justetf.common.io import open_justetf_session
+from mxm.datakraken.sources.justetf.common.io import open_justetf_session
 
 
 def _response_bytes(resp: IoResponse) -> bytes:

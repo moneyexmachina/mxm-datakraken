@@ -9,12 +9,12 @@ from typing import Any, Dict, List, Protocol, Tuple, cast
 import pytest
 from mxm_config import MXMConfig
 
-from mxm_datakraken.sources.justetf.batch.core import (
+from mxm.datakraken.sources.justetf.batch.core import (
     process_one_entry,
     resolve_bucket,
     should_skip,
 )
-from mxm_datakraken.sources.justetf.common.models import JustETFProfile
+from mxm.datakraken.sources.justetf.common.models import JustETFProfile
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -80,7 +80,7 @@ def test_resolve_bucket_prefers_provided(
 ) -> None:
     # Even if latest exists or resp bucket exists, provided wins
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.batch.core.resolve_latest_bucket",
+        "mxm.datakraken.sources.justetf.batch.core.resolve_latest_bucket",
         lambda _root: "2000-01-01",
     )
     out = resolve_bucket(
@@ -96,7 +96,7 @@ def test_resolve_bucket_uses_first_resp_when_no_provided(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.batch.core.resolve_latest_bucket",
+        "mxm.datakraken.sources.justetf.batch.core.resolve_latest_bucket",
         lambda _root: "2000-01-01",
     )
     out = resolve_bucket(
@@ -112,7 +112,7 @@ def test_resolve_bucket_uses_latest_on_disk_when_no_provided_or_resp(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.batch.core.resolve_latest_bucket",
+        "mxm.datakraken.sources.justetf.batch.core.resolve_latest_bucket",
         lambda _root: "2011-11-11",
     )
     out = resolve_bucket(
@@ -132,7 +132,7 @@ def test_resolve_bucket_falls_back_to_today_when_no_other_source(
         raise RuntimeError("no buckets")
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.batch.core.resolve_latest_bucket",
+        "mxm.datakraken.sources.justetf.batch.core.resolve_latest_bucket",
         boom,
     )
     # Without today_iso, it should use real today; just check format

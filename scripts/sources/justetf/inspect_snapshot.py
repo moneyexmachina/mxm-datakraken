@@ -25,8 +25,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from mxm_datakraken.config.config import justetf_view
-from mxm_datakraken.sources.justetf.common.models import JustETFProfile
+from mxm.datakraken.config.config import justetf_view
+from mxm.datakraken.sources.justetf.common.models import JustETFProfile
 
 console = Console()
 

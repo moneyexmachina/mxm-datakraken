@@ -18,8 +18,8 @@ from typing import Callable, Optional, Tuple
 
 from mxm_config import MXMConfig
 
-from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm_datakraken.sources.justetf.common.models import (
+from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
+from mxm.datakraken.sources.justetf.common.models import (
     ETFProfileIndexEntry,
     JustETFProfile,
 )

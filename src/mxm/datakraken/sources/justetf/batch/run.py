@@ -7,21 +7,21 @@ from typing import Optional, Sequence, cast
 
 from mxm_config import MXMConfig
 
-from mxm_datakraken.sources.justetf.batch.core import (
+from mxm.datakraken.sources.justetf.batch.core import (
     BatchStats,
     process_one_entry,
     resolve_bucket,
     should_skip,
 )
-from mxm_datakraken.sources.justetf.batch.runlog import RunLog
-from mxm_datakraken.sources.justetf.common.models import (
+from mxm.datakraken.sources.justetf.batch.runlog import RunLog
+from mxm.datakraken.sources.justetf.common.models import (
     ETFProfileIndexEntry,
     JustETFProfile,
 )
-from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
-from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
-from mxm_datakraken.sources.justetf.profiles.parser import parse_profile
-from mxm_datakraken.sources.justetf.profiles.persistence import (
+from mxm.datakraken.sources.justetf.profile_index.api import get_profile_index
+from mxm.datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
+from mxm.datakraken.sources.justetf.profiles.parser import parse_profile
+from mxm.datakraken.sources.justetf.profiles.persistence import (
     save_profile,
     save_profiles_snapshot,
 )

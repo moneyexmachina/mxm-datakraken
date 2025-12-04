@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from mxm_datakraken.sources.justetf.profiles.parser import parse_profile
+from mxm.datakraken.sources.justetf.profiles.parser import parse_profile
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 HTML_PATH = DATA_DIR / "sample_etf.html"

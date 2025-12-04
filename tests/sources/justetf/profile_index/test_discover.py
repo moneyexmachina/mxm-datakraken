@@ -14,7 +14,7 @@ import pytest
 from mxm.types import JSONObj
 from mxm_config import MXMConfig
 
-from mxm_datakraken.sources.justetf.profile_index.discover import (
+from mxm.datakraken.sources.justetf.profile_index.discover import (
     build_profile_index,
 )
 
@@ -80,7 +80,7 @@ def test_build_profile_index_from_sample_via_dataio(
         yield dummy_io
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profile_index.discover.open_justetf_session",
+        "mxm.datakraken.sources.justetf.profile_index.discover.open_justetf_session",
         _patched_open_justetf_session,
         raising=True,
     )

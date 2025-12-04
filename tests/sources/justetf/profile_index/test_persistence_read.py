@@ -9,8 +9,8 @@ from typing import List
 
 import pytest
 
-from mxm_datakraken.sources.justetf.profile_index.discover import ETFProfileIndexEntry
-from mxm_datakraken.sources.justetf.profile_index.persistence import (
+from mxm.datakraken.sources.justetf.profile_index.discover import ETFProfileIndexEntry
+from mxm.datakraken.sources.justetf.profile_index.persistence import (
     load_profile_index,
     save_profile_index,
 )

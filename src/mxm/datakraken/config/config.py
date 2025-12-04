@@ -13,7 +13,7 @@ from typing import Iterable
 
 from mxm_config import MXMConfig, make_view
 
-from mxm_datakraken.common.caching import (
+from mxm.datakraken.common.caching import (
     CachePolicy,
     resolve_as_of_bucket,
     resolve_cache_mode,

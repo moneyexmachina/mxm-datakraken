@@ -7,13 +7,13 @@ license = "MIT"
 readme = "README.md"
 
 packages = [
-  { include = "mxm_datakraken" }
+  { include = "mxm",from="src" }
 ]
 
 # ship asset files in both sdist and wheel
 include = [
-  { path = "mxm_datakraken/assets/**/*.txt", format = "sdist" },
-  { path = "mxm_datakraken/assets/**/*.txt", format = "wheel" }
+  { path = "src/mxm/datakraken/assets/**/*.txt", format = "sdist" },
+  { path = "src/mxm/datakraken/assets/**/*.txt", format = "wheel" }
 ]
 
 
@@ -56,7 +56,7 @@ combine_as_imports = true
 
 [tool.pyright]
 typeCheckingMode = "strict"
-include = ["mxm_datakraken"]
+include = ["src"]
 exclude = ["build", "dist", "docs", ".venv"]
 pythonVersion = "3.13"
 pythonPlatform = "All"

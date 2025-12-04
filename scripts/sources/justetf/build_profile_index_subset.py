@@ -9,7 +9,7 @@ Workflow:
 5) Resolve ISIN universe:
     - CLI override path (--universe-path), else
     - cfg.sources.justetf.etf_universe_override_paths (optional list), else
-    - packaged default from mxm_datakraken.assets.etf_universe
+    - packaged default from mxm.datakraken.assets.etf_universe
 6) Filter index entries to those ISINs.
 7) Persist filtered index under:
      profile_index_subsets/<YYYY-MM-DD>/{subset.parsed.json, subset.meta.json}
@@ -27,16 +27,16 @@ from typing import Iterable, Sequence, cast
 
 from mxm_config import MXMConfig, load_config
 
-from mxm_datakraken.assets.etf_universe import (
+from mxm.datakraken.assets.etf_universe import (
     load_default_isin_universe,
     load_isin_universe_override,
 )
-from mxm_datakraken.bootstrap import register_adapters_from_config
-from mxm_datakraken.common.file_io import read_json, write_json
-from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm_datakraken.common.types import JSONLike
-from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
-from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
+from mxm.datakraken.bootstrap import register_adapters_from_config
+from mxm.datakraken.common.file_io import read_json, write_json
+from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
+from mxm.datakraken.common.types import JSONLike
+from mxm.datakraken.sources.justetf.common.models import ETFProfileIndexEntry
+from mxm.datakraken.sources.justetf.profile_index.api import get_profile_index
 
 
 def _sha256_lines(lines: Iterable[str]) -> str:

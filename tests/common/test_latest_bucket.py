@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from mxm_datakraken.common.latest_bucket import (
+from mxm.datakraken.common.latest_bucket import (
     resolve_latest_bucket,
     update_latest_pointer,
 )

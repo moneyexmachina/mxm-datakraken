@@ -9,7 +9,7 @@ from mxm.types import JSONLike, JSONObj
 from mxm_config import MXMConfig
 
 # Target the orchestrator module for monkeypatches
-import mxm_datakraken.sources.justetf.batch.run as run_mod
+import mxm.datakraken.sources.justetf.batch.run as run_mod
 
 
 def _read_jsonl(path: Path) -> List[JSONObj]:

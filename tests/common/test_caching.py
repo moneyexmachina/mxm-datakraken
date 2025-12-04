@@ -4,7 +4,7 @@ from datetime import date
 
 from mxm_dataio.api import CacheMode
 
-from mxm_datakraken.common.caching import (
+from mxm.datakraken.common.caching import (
     resolve_as_of_bucket,
     resolve_cache_mode,
 )

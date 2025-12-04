@@ -14,7 +14,7 @@ import pytest
 from mxm.types import JSONObj
 from mxm_config import MXMConfig
 
-from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
+from mxm.datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
 
 # --- DataIO test doubles ------------------------------------------------------
 
@@ -92,7 +92,7 @@ def test_download_etf_profile_html_success(
         yield dummy_io
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profiles.downloader.open_justetf_session",
+        "mxm.datakraken.sources.justetf.profiles.downloader.open_justetf_session",
         _patched_open_justetf_session,
         raising=True,
     )
@@ -121,7 +121,7 @@ def test_download_etf_profile_html_failure(monkeypatch: pytest.MonkeyPatch) -> N
         yield dummy_io
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profiles.downloader.open_justetf_session",
+        "mxm.datakraken.sources.justetf.profiles.downloader.open_justetf_session",
         _patched_open_justetf_session,
         raising=True,
     )

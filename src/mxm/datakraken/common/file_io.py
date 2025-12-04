@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from typing import cast
 
-from mxm_datakraken.common.types import JSONLike
+from mxm.datakraken.common.types import JSONLike
 
 __all__ = ["write_json", "read_json"]
 
