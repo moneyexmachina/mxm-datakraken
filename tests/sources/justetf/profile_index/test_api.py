@@ -12,10 +12,10 @@ from typing import NoReturn, cast
 import pytest
 from mxm_config import MXMConfig
 
-from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
-from mxm_datakraken.sources.justetf.profile_index.api import get_profile_index
-from mxm_datakraken.sources.justetf.profile_index.persistence import save_profile_index
+from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
+from mxm.datakraken.sources.justetf.common.models import ETFProfileIndexEntry
+from mxm.datakraken.sources.justetf.profile_index.api import get_profile_index
+from mxm.datakraken.sources.justetf.profile_index.persistence import save_profile_index
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def test_get_profile_index_first_run(
         return fake_index, _fake_resp(tmp_path)
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profile_index.api.build_profile_index",
+        "mxm.datakraken.sources.justetf.profile_index.api.build_profile_index",
         fake_build,
         raising=True,
     )
@@ -112,7 +112,7 @@ def test_get_profile_index_force_refresh(
         return fake_index, _fake_resp(tmp_path)
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profile_index.api.build_profile_index",
+        "mxm.datakraken.sources.justetf.profile_index.api.build_profile_index",
         fake_build,
         raising=True,
     )
@@ -147,7 +147,7 @@ def test_get_profile_index_bucket_selection(
         )
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profile_index.api.build_profile_index",
+        "mxm.datakraken.sources.justetf.profile_index.api.build_profile_index",
         _boom,
         raising=True,
     )

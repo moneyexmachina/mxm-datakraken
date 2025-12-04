@@ -27,13 +27,13 @@ from typing import cast
 
 from mxm_dataio.models import Response as IoResponse
 
-from mxm_datakraken.common.file_io import read_json, write_json
-from mxm_datakraken.common.latest_bucket import (
+from mxm.datakraken.common.file_io import read_json, write_json
+from mxm.datakraken.common.latest_bucket import (
     resolve_latest_bucket,
     update_latest_pointer,
 )
-from mxm_datakraken.common.types import JSONLike
-from mxm_datakraken.sources.justetf.common.models import JustETFProfile
+from mxm.datakraken.common.types import JSONLike
+from mxm.datakraken.sources.justetf.common.models import JustETFProfile
 
 # ---------------------------
 # Internal path helper

@@ -38,7 +38,7 @@ Behavior & guarantees
 Usage
 -----
     from mxm_config import load_config
-    from mxm_datakraken.bootstrap import register_adapters_from_config
+    from mxm.datakraken.bootstrap import register_adapters_from_config
 
     cfg = load_config(package="mxm-datakraken", env="dev", profile="default")
     register_adapters_from_config(cfg)
@@ -65,8 +65,8 @@ from typing import Any, Mapping, Optional, cast
 from mxm_config import MXMConfig
 from mxm_dataio.registry import register
 
-from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
-from mxm_datakraken.config.config import justetf_http_adapter_view
+from mxm.datakraken.common.http_adapter import HttpRequestsAdapter
+from mxm.datakraken.config.config import justetf_http_adapter_view
 
 
 def _coerce_headers(m: Optional[Mapping[str, Any]]) -> Optional[Mapping[str, str]]:

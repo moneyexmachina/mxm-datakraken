@@ -9,9 +9,9 @@ from pathlib import Path
 
 import pytest
 
-from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm_datakraken.sources.justetf.profile_index.discover import ETFProfileIndexEntry
-from mxm_datakraken.sources.justetf.profile_index.persistence import save_profile_index
+from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
+from mxm.datakraken.sources.justetf.profile_index.discover import ETFProfileIndexEntry
+from mxm.datakraken.sources.justetf.profile_index.persistence import save_profile_index
 
 
 @pytest.fixture

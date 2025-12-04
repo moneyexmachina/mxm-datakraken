@@ -53,7 +53,7 @@ def mxm_config_home(
 
     Usage in tests:
         home_for = mxm_config_home
-        home_for("mxm-datakraken", "mxm_datakraken")
+        home_for("mxm-datakraken", "mxm.datakraken")
         # Now load_config(package="mxm-datakraken", ...) reads from repo YAMLs
         (no install).
     """

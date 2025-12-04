@@ -21,8 +21,8 @@ from mxm_config import MXMConfig
 from mxm_dataio.models import Response as IoResponse
 from mxm_dataio.types import RequestParams
 
-from mxm_datakraken.sources.justetf.common.io import open_justetf_session
-from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
+from mxm.datakraken.sources.justetf.common.io import open_justetf_session
+from mxm.datakraken.sources.justetf.common.models import ETFProfileIndexEntry
 
 SITEMAP_URL: str = "https://www.justetf.com/sitemap5.xml"
 NS: dict[str, str] = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}

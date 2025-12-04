@@ -10,7 +10,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from mxm_datakraken.sources.justetf.profiles.parser import (
+from mxm.datakraken.sources.justetf.profiles.parser import (
     extract_data_table,
     extract_description,
     extract_name,

@@ -9,10 +9,10 @@ from typing import List, cast
 
 from mxm_dataio.models import Response as IoResponse
 
-from mxm_datakraken.common.file_io import read_json, write_json
-from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm_datakraken.common.types import JSONLike
-from mxm_datakraken.sources.justetf.profile_index.discover import (
+from mxm.datakraken.common.file_io import read_json, write_json
+from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
+from mxm.datakraken.common.types import JSONLike
+from mxm.datakraken.sources.justetf.profile_index.discover import (
     ETFProfileIndexEntry,
 )
 
@@ -68,7 +68,7 @@ def save_profile_index(
     write_latest: bool = True,
 ) -> Path:
     """Persist the profile index snapshot and (optionally) its provenance sidecar."""
-    from mxm_datakraken.common.latest_bucket import update_latest_pointer
+    from mxm.datakraken.common.latest_bucket import update_latest_pointer
 
     if provenance is None and not as_of_bucket:
         raise ValueError("Provide either 'provenance' (preferred) or 'as_of_bucket'.")

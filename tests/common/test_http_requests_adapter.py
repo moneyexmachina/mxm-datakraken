@@ -10,7 +10,7 @@ from mxm_dataio.models import Request
 from mxm_dataio.types import RequestParams
 from requests import HTTPError, Response, Session
 
-from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
+from mxm.datakraken.common.http_adapter import HttpRequestsAdapter
 
 # ----- helpers ---------------------------------------------------------------
 

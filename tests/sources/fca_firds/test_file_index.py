@@ -1,7 +1,7 @@
 import pytest
 from mxm.types import JSONLike, JSONObj
 
-import mxm_datakraken.sources.fca_firds.file_index as fi
+import mxm.datakraken.sources.fca_firds.file_index as fi
 
 # -----------------------------
 # Unit tests with mocked API

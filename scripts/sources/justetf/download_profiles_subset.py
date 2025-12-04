@@ -23,10 +23,10 @@ from typing import Any, List, Sequence, cast
 
 from mxm_config import load_config
 
-from mxm_datakraken.bootstrap import register_adapters_from_config
-from mxm_datakraken.config.config import ensure_justetf_config
-from mxm_datakraken.sources.justetf.batch import run_batch
-from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
+from mxm.datakraken.bootstrap import register_adapters_from_config
+from mxm.datakraken.config.config import ensure_justetf_config
+from mxm.datakraken.sources.justetf.batch import run_batch
+from mxm.datakraken.sources.justetf.common.models import ETFProfileIndexEntry
 
 
 def _validate_subset(items: Sequence[dict[str, Any]]) -> list[ETFProfileIndexEntry]:

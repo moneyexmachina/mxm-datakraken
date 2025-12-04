@@ -1,4 +1,4 @@
-# mxm_datakraken/sources/fca_firds/file_index.py
+# mxm.datakraken/sources/fca_firds/file_index.py
 from __future__ import annotations
 
 import dataclasses as dc

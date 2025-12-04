@@ -21,7 +21,7 @@ from mxm_config import load_config
 from rich.console import Console
 from rich.table import Table
 
-from mxm_datakraken.config.config import justetf_view
+from mxm.datakraken.config.config import justetf_view
 
 console = Console()
 

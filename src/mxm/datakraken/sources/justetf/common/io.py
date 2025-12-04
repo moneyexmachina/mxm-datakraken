@@ -6,7 +6,7 @@ from typing import Iterator
 from mxm_config import MXMConfig
 from mxm_dataio.api import DataIoSession
 
-from mxm_datakraken.config.config import dataio_for_justetf, load_justetf_policy
+from mxm.datakraken.config.config import dataio_for_justetf, load_justetf_policy
 
 
 @contextmanager

@@ -16,7 +16,7 @@ from typing import cast
 
 from bs4 import BeautifulSoup, Tag
 
-from mxm_datakraken.sources.justetf.common.models import JustETFProfile
+from mxm.datakraken.sources.justetf.common.models import JustETFProfile
 
 
 def parse_profile(
