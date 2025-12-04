@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 
 packages = [
-  { include = "mxm.datakraken",from="src" }
+  { include = "mxm",from="src" }
 ]
 
 # ship asset files in both sdist and wheel
