@@ -4,143 +4,135 @@ Persistence helpers for the ETF Profile Index.
 
 from __future__ import annotations
 
-import json
-from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterable, Tuple
+from typing import List, cast
 
 from mxm_dataio.models import Response as IoResponse
 
+from mxm_datakraken.common.file_io import read_json, write_json
+from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
+from mxm_datakraken.common.types import JSONLike
 from mxm_datakraken.sources.justetf.profile_index.discover import (
     ETFProfileIndexEntry,
 )
 
 
-def _write_json(path: Path, data: Any) -> Path:
-    """Write JSON to disk, creating parent dirs as needed."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    return path
+def _write_index_provenance(
+    bucket_dir: Path,
+    *,
+    bucket: str,
+    resp: IoResponse,
+) -> Path:
+    """Write the bucketed provenance sidecar for the profile index.
 
+    Layout (new only):
+        <pi_root>/<bucket>/profile_index.response.json
 
-def _read_json(path: Path) -> Any:
-    """Read JSON from disk."""
-    return json.loads(path.read_text(encoding="utf-8"))
+    Args:
+        pi_root: The 'profile_index' directory (i.e., base_path / 'profile_index').
+        bucket_dir: The resolved '<pi_root>/<bucket>' directory (already created).
+        bucket: The as_of_bucket identifier.
+        resp: The DataIO Response returned from the sitemap fetch.
 
-
-def _save_index_provenance(base_path: Path, *, as_of: date, resp: IoResponse) -> Path:
-    """Write a sidecar provenance file for a given snapshot date."""
-    meta = {
-        "dataio_response_id": resp.id,
-        "dataio_request_id": resp.request_id,
-        "checksum": resp.checksum,
-        "path": resp.path,
-        "created_at": resp.created_at.isoformat(),
-        "sequence": resp.sequence,
-        "size_bytes": resp.size_bytes,
+    Returns: Path to the written sidecar JSON.
+    """
+    sidecar: JSONLike = {
+        "source": "justetf",
+        "kind": "profile_index",
+        "bucket": bucket,
+        "response": {
+            "id": getattr(resp, "id", None),
+            "request_id": getattr(resp, "request_id", None),
+            "path": getattr(resp, "path", None),
+            "checksum": getattr(resp, "checksum", None),
+            "created_at": getattr(resp, "created_at", None)
+            and resp.created_at.isoformat(),  # type: ignore[attr-defined]
+            "size_bytes": getattr(resp, "size_bytes", None),
+            "sequence": getattr(resp, "sequence", None),
+            # Policy identity (mxm-dataio >= 0.3.0)
+            "cache_mode": getattr(resp, "cache_mode", None),
+            "ttl_seconds": getattr(resp, "ttl", None),
+            "as_of_bucket": getattr(resp, "as_of_bucket", None),
+            "cache_tag": getattr(resp, "cache_tag", None),
+        },
     }
-    out = base_path / "profile_index" / f"provenance_{as_of.isoformat()}.json"
-    return _write_json(out, meta)
-
-
-def _iter_snapshot_files(pi_dir: Path) -> Iterable[Tuple[date, Path]]:
-    """
-    Yield (snapshot_date, path) for files named 'profile_index_YYYY-MM-DD.json'.
-    Ignores files that do not match the expected pattern.
-    """
-    prefix = "profile_index_"
-    suffix = ".json"
-    for p in pi_dir.glob("profile_index_*.json"):
-        name = p.name
-        if not (name.startswith(prefix) and name.endswith(suffix)):
-            continue
-        # Extract the date portion between prefix and suffix
-        dt_str = name[len(prefix) : -len(suffix)]
-        try:
-            yield datetime.strptime(dt_str, "%Y-%m-%d").date(), p
-        except ValueError:
-            # Skip malformed filenames
-            continue
-
-
-def _best_snapshot_path(pi_dir: Path, *, as_of: date) -> Path:
-    """
-    Return the path to the most recent snapshot <= as_of.
-    Raises FileNotFoundError if none found.
-    """
-    candidates = [(d, p) for d, p in _iter_snapshot_files(pi_dir) if d <= as_of]
-    if not candidates:
-        raise FileNotFoundError(
-            f"No profile index snapshot found on or before {as_of.isoformat()}"
-        )
-    _, best_path = max(candidates, key=lambda t: t[0])
-    return best_path
+    return write_json(bucket_dir / "profile_index.response.json", sidecar)
 
 
 def save_profile_index(
     entries: list[ETFProfileIndexEntry],
     base_path: Path,
     *,
-    as_of: date,
-    write_latest: bool = True,
     provenance: IoResponse | None = None,
+    as_of_bucket: str | None = None,
+    write_latest: bool = True,
 ) -> Path:
     """Persist the profile index snapshot and (optionally) its provenance sidecar."""
-    pi_dir = base_path / "profile_index"
-    pi_dir.mkdir(parents=True, exist_ok=True)
+    from mxm_datakraken.common.latest_bucket import update_latest_pointer
 
-    out = pi_dir / f"profile_index_{as_of.isoformat()}.json"
-    _write_json(out, entries)
+    if provenance is None and not as_of_bucket:
+        raise ValueError("Provide either 'provenance' (preferred) or 'as_of_bucket'.")
+    bucket = as_of_bucket or getattr(provenance, "as_of_bucket", None)
+    if not isinstance(bucket, str) or not bucket:
+        raise ValueError("Missing/invalid as_of_bucket.")
 
-    if write_latest:
-        _write_json(pi_dir / "latest.json", entries)
+    pi_root = base_path / "profile_index"
+    bucket_dir = pi_root / bucket
+    bucket_dir.mkdir(parents=True, exist_ok=True)
+
+    parsed_path = bucket_dir / "profile_index.parsed.json"
+    write_json(parsed_path, cast(JSONLike, entries))
 
     if provenance is not None:
-        _save_index_provenance(base_path, as_of=as_of, resp=provenance)
-
-    return out
+        _write_index_provenance(
+            bucket_dir=bucket_dir,
+            bucket=bucket,
+            resp=provenance,
+        )
+    if write_latest:
+        update_latest_pointer(pi_root, bucket)
+    return parsed_path
 
 
 def load_profile_index(
     base_path: Path,
     *,
-    as_of: date | None = None,
-) -> list[ETFProfileIndexEntry]:
+    as_of_bucket: str | None = None,
+) -> List[ETFProfileIndexEntry]:
     """
-    Load the ETF Profile Index.
+    Load the ETF Profile Index from the bucketed layout.
 
-    Behavior
-    --------
-    - If as_of is None:
-        * Prefer 'latest.json' if present.
-        * Otherwise, load the newest dated snapshot 'profile_index_YYYY-MM-DD.json'.
-    - If as_of is provided:
-        * Load the most recent snapshot with date <= as_of.
-        * If none exist, raise FileNotFoundError.
+    Priority:
+      1) If `as_of_bucket` is provided:
+      load profile_index/<bucket>/profile_index.parsed.json
+      2) Else, try the 'latest' pointer (symlink or LATEST_BUCKET)
+      3) Else, fall back to the lexicographically last bucket directory
 
-    Returns
-    -------
-    list[ETFProfileIndexEntry]
+    Raises:
+      FileNotFoundError if nothing suitable is found.
     """
-    pi_dir = base_path / "profile_index"
-    if not pi_dir.exists():
-        raise FileNotFoundError(f"Profile index directory not found: {pi_dir}")
+    pi_root = base_path / "profile_index"
+    if not pi_root.exists():
+        raise FileNotFoundError(f"Profile index directory not found: {pi_root}")
 
-    if as_of is None:
-        latest_path = pi_dir / "latest.json"
-        if latest_path.exists():
-            data = _read_json(latest_path)
-            return list(data)  # type: ignore[return-value]
-        # Fallback to newest dated snapshot
-        candidates = list(_iter_snapshot_files(pi_dir))
-        if not candidates:
-            raise FileNotFoundError("No profile index snapshots found.")
-        # Pick newest by date
-        _, newest_path = max(candidates, key=lambda t: t[0])
-        data = _read_json(newest_path)
-        return list(data)  # type: ignore[return-value]
+    bucket = as_of_bucket or resolve_latest_bucket(pi_root)
+    if bucket is None:
+        # fallback: pick lexicographically last bucket dir
+        buckets = sorted(
+            [
+                p.name
+                for p in pi_root.iterdir()
+                if p.is_dir() and p.name not in {"latest"}
+            ]
+        )
+        if not buckets:
+            raise FileNotFoundError("No profile index buckets found.")
+        bucket = buckets[-1]
 
-    # as_of provided: pick best snapshot <= as_of
-    snap_path = _best_snapshot_path(pi_dir, as_of=as_of)
-    data = _read_json(snap_path)
-    return list(data)  # type: ignore[return-value]
+    parsed_path = pi_root / bucket / "profile_index.parsed.json"
+    if not parsed_path.exists():
+        raise FileNotFoundError(
+            f"Parsed index not found for bucket '{bucket}': {parsed_path}"
+        )
+
+    return cast(List[ETFProfileIndexEntry], read_json(parsed_path))

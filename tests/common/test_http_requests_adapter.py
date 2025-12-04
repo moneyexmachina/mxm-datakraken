@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 from types import MethodType
-from typing import Any, Dict, Mapping, MutableMapping, Optional, cast
+from typing import Dict, Mapping, MutableMapping, NoReturn, Optional, cast
 
 import pytest
 from mxm_dataio.models import Request
+from mxm_dataio.types import RequestParams
 from requests import HTTPError, Response, Session
 
 from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
@@ -14,9 +15,9 @@ from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
 # ----- helpers ---------------------------------------------------------------
 
 
-def _req(kind: str, params: Mapping[str, Any]) -> Request:
+def _req(kind: str, params: RequestParams) -> Request:
     """Construct a Request with a fixed session_id for tests."""
-    return Request(kind=kind, params=dict(params), session_id="test-session")
+    return Request(kind=kind, params=params, session_id="test-session")
 
 
 # ----- test doubles ----------------------------------------------------------
@@ -57,7 +58,7 @@ class _DummyResp:
             raise HTTPError(f"HTTP {self.status_code}")
 
     # For typing compatibility when annotated as Response
-    def __getattr__(self, name: str) -> Any:  # pragma: no cover - safety net
+    def __getattr__(self, name: str) -> NoReturn:
         raise AttributeError(name)
 
 
@@ -66,7 +67,7 @@ def _patch_request(
 ) -> None:
     """Monkeypatch Session.request to capture call args and return dummy response."""
 
-    def _fake_request(  # type: ignore[override]
+    def _fake_request(
         self: Session,
         *,
         method: str,
@@ -75,7 +76,7 @@ def _patch_request(
         timeout: float | int | None = None,
         data: Optional[bytes] = None,
         allow_redirects: bool = True,
-        **_: Any,
+        **_: object,
     ) -> Response:
         call_sink.append(
             _Call(
@@ -129,17 +130,17 @@ def test_post_with_string_body_encodes_utf8() -> None:
     _patch_request(adapter, dummy, calls)
 
     body_str = '{"ok": "✓"}'
-    req = _req(
-        "post",
-        {
-            "url": "https://example.test/api",
-            "method": "POST",
-            "body": body_str,  # str should be encoded as utf-8
-            "headers": {"Content-Type": "application/json"},
-            "timeout": 5,
-            "allow_redirects": False,
+    params = {
+        "url": "https://example.test/api",
+        "method": "POST",
+        "body": body_str,  # str should be encoded as utf-8
+        "headers": {
+            "Content-Type": "application/json",
         },
-    )
+        "timeout": 5,
+        "allow_redirects": False,
+    }  # NOTE: headers use a nested mapping, which RequestParams doesn't model yet.
+    req = _req("post", cast(RequestParams, params))
     res = adapter.fetch(req)
 
     assert res.transport_status == 200
@@ -175,13 +176,16 @@ def test_headers_merge() -> None:
     calls: list[_Call] = []
     dummy = _DummyResp()
     _patch_request(adapter, dummy, calls)
-
+    params = {
+        "url": "https://example.test/x",
+        "headers": {"X-Test": "1", "Accept": "application/xml"},
+    }
+    # NOTE: headers use a nested mapping, which RequestParams doesn't model yet.
+    # Once mxm-dataio's RequestParams is widened (likely via mxm-types),
+    # this cast can go.
     req = _req(
         "get",
-        {
-            "url": "https://example.test/x",
-            "headers": {"X-Test": "1", "Accept": "application/xml"},
-        },
+        cast(RequestParams, params),
     )
     _ = adapter.fetch(req)
 

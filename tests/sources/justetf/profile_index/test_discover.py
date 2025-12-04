@@ -5,11 +5,13 @@ Tests for building the ETF Profile Index from the justETF sitemap (DataIO-backed
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace, TracebackType
-from typing import Any, Dict, Optional, Tuple, Type, cast
+from typing import Iterator, Optional, Type, cast
 
 import pytest
+from mxm.types import JSONObj
 from mxm_config import MXMConfig
 
 from mxm_datakraken.sources.justetf.profile_index.discover import (
@@ -24,8 +26,7 @@ class _DummyIoResponse:
         self.path: str = str(path)
         self.checksum: str = checksum
 
-    # Keep signature compatible with the real Response.verify(data: bytes) -> bool
-    def verify(self, data: bytes) -> bool:  # noqa: D401 - simple stand-in
+    def verify(self, data: bytes) -> bool:
         return hashlib.sha256(data).hexdigest() == self.checksum
 
 
@@ -35,7 +36,7 @@ class _DummyIo:
     def __init__(self, payload_path: Path) -> None:
         self._payload_path: Path = payload_path
         self._checksum: str = hashlib.sha256(payload_path.read_bytes()).hexdigest()
-        self.requests: list[Any] = []
+        self.requests: list[SimpleNamespace] = []
 
     def __enter__(self) -> "_DummyIo":
         return self
@@ -46,17 +47,15 @@ class _DummyIo:
         exc: Optional[BaseException],
         tb: Optional[TracebackType],
     ) -> None:
-        _ = exc_type
-        _ = exc
-        _ = tb
+        _ = exc_type, exc, tb
         return None
 
-    def request(self, kind: str, params: dict[str, Any]) -> SimpleNamespace:
+    def request(self, kind: str, params: JSONObj) -> SimpleNamespace:
         ns = SimpleNamespace(kind=kind, params=params)
         self.requests.append(ns)
         return ns
 
-    def fetch(self, _req: Any) -> _DummyIoResponse:
+    def fetch(self, _req: object) -> _DummyIoResponse:
         _ = _req
         return _DummyIoResponse(self._payload_path, self._checksum)
 
@@ -64,8 +63,9 @@ class _DummyIo:
 def test_build_profile_index_from_sample_via_dataio(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Ensure build_profile_index works correctly on a sample sitemap fixture using DataIO."""
-    # Load local XML fixture as BYTES and persist to a temp file to mimic DataIO payload-on-disk
+    """Ensure build_profile_index works correctly on a sample sitemap fixture
+    using DataIO."""
+    # Prepare a fake DataIO payload file
     sample_path: Path = Path(__file__).parent.parent / "data" / "sample_sitemap.xml"
     xml_bytes: bytes = sample_path.read_bytes()
     payload_path = tmp_path / "sitemap.xml"
@@ -73,32 +73,20 @@ def test_build_profile_index_from_sample_via_dataio(
 
     dummy_io = _DummyIo(payload_path)
 
-    # Typed helpers instead of lambdas (quiet Pyright)
-    def _patched_dataio_session(*args: Any, **kwargs: Any) -> _DummyIo:
-        _ = args
-        _ = kwargs
-        # Signature is intentionally broad; runtime path under test just needs a CM
-        return dummy_io
-
-    def _patched_dataio_for_justetf(_cfg: Any) -> Tuple[str, Dict[str, Any]]:
+    # Patch the helper used by discover.py to open a session
+    @contextmanager
+    def _patched_open_justetf_session(_cfg: MXMConfig) -> Iterator[_DummyIo]:
         _ = _cfg
-        # Alias resolution doesn't matter for this unit; return any (proto-)config
-        return ("http", {})
+        yield dummy_io
 
-    # Patch the DataIoSession used inside discover.py to return our dummy context manager
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profile_index.discover.DataIoSession",
-        _patched_dataio_session,
-        raising=True,
-    )
-    monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profile_index.discover.dataio_for_justetf",
-        _patched_dataio_for_justetf,
+        "mxm_datakraken.sources.justetf.profile_index.discover.open_justetf_session",
+        _patched_open_justetf_session,
         raising=True,
     )
 
     # Provide a cfg that satisfies the MXMConfig protocol to the type checker
-    cfg: MXMConfig = cast(MXMConfig, {})  # runtime doesn't use cfg thanks to patches
+    cfg: MXMConfig = cast(MXMConfig, {})  # runtime untouched due to patch
     index, _ = build_profile_index(cfg, sitemap_url="dummy-url")
 
     # Expect exactly 3 ISINs from the sample fixture
@@ -109,3 +97,10 @@ def test_build_profile_index_from_sample_via_dataio(
     # Ensure all canonical URLs are English (/en/)
     for entry in index:
         assert "/en/" in entry["url"]
+
+    # (Optional) sanity: the function issued exactly one sitemap request
+    assert len(dummy_io.requests) == 1
+    req = dummy_io.requests[0]
+    assert req.kind == "sitemap"
+    assert req.params["method"] == "GET"
+    assert req.params["headers"]["Accept"] == "application/xml"

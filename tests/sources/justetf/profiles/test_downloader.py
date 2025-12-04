@@ -5,11 +5,13 @@ Tests for downloader of ETF profile HTML (DataIO-backed).
 from __future__ import annotations
 
 import hashlib
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace, TracebackType
-from typing import Any, Dict, Optional, Tuple, Type, cast
+from typing import Iterator, Optional, Type, cast
 
 import pytest
+from mxm.types import JSONObj
 from mxm_config import MXMConfig
 
 from mxm_datakraken.sources.justetf.profiles.downloader import download_etf_profile_html
@@ -40,7 +42,7 @@ class _DummyIo:
     ) -> None:
         self._payload_path: Optional[Path] = payload_path
         self._raise: Optional[Exception] = raise_on_fetch
-        self.requests: list[Any] = []
+        self.requests: list[SimpleNamespace] = []
 
     def __enter__(self) -> "_DummyIo":
         return self
@@ -54,12 +56,12 @@ class _DummyIo:
         _ = (exc_type, exc_val, exc_tb)
         return None
 
-    def request(self, kind: str, params: dict[str, Any]) -> SimpleNamespace:
+    def request(self, kind: str, params: JSONObj) -> SimpleNamespace:
         ns = SimpleNamespace(kind=kind, params=params)
         self.requests.append(ns)
         return ns
 
-    def fetch(self, _req: Any) -> _DummyIoResponse:
+    def fetch(self, _req: object) -> _DummyIoResponse:
         _ = _req
         if self._raise is not None:
             raise self._raise
@@ -83,22 +85,15 @@ def test_download_etf_profile_html_success(
 
     dummy_io = _DummyIo(payload_path=payload_path)
 
-    # Typed helpers instead of lambdas (quiet Pyright)
-    def _patched_dataio_session(*args: Any, **kwargs: Any) -> _DummyIo:
-        return dummy_io
+    # Patch the session helper used by the downloader module
+    @contextmanager
+    def _patched_open_justetf_session(_cfg: MXMConfig) -> Iterator[_DummyIo]:
+        _ = _cfg
+        yield dummy_io
 
-    def _patched_dataio_for_justetf(_cfg: Any) -> Tuple[str, Dict[str, Any]]:
-        return ("http", {})
-
-    # Patch the DataIoSession and alias resolver inside the downloader module
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profiles.downloader.DataIoSession",
-        _patched_dataio_session,
-        raising=True,
-    )
-    monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profiles.downloader.dataio_for_justetf",
-        _patched_dataio_for_justetf,
+        "mxm_datakraken.sources.justetf.profiles.downloader.open_justetf_session",
+        _patched_open_justetf_session,
         raising=True,
     )
 
@@ -108,26 +103,26 @@ def test_download_etf_profile_html_success(
     )
     assert "<h1>ETF Test</h1>" in html
 
+    # Optional: sanity-check the request shape
+    assert len(dummy_io.requests) == 1
+    req = dummy_io.requests[0]
+    assert req.kind == "profile_html"
+    assert req.params["method"] == "GET"
+    assert req.params["headers"]["Accept"] == "text/html"
+
 
 def test_download_etf_profile_html_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure exceptions are propagated when DataIO/adapter raises."""
-    # Simulate adapter/network failure by raising from fetch()
     dummy_io = _DummyIo(raise_on_fetch=RuntimeError("network down"))
 
-    def _patched_dataio_session(*args: Any, **kwargs: Any) -> _DummyIo:
-        return dummy_io
-
-    def _patched_dataio_for_justetf(_cfg: Any) -> Tuple[str, Dict[str, Any]]:
-        return ("http", {})
+    @contextmanager
+    def _patched_open_justetf_session(_cfg: MXMConfig) -> Iterator[_DummyIo]:
+        _ = _cfg
+        yield dummy_io
 
     monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profiles.downloader.DataIoSession",
-        _patched_dataio_session,
-        raising=True,
-    )
-    monkeypatch.setattr(
-        "mxm_datakraken.sources.justetf.profiles.downloader.dataio_for_justetf",
-        _patched_dataio_for_justetf,
+        "mxm_datakraken.sources.justetf.profiles.downloader.open_justetf_session",
+        _patched_open_justetf_session,
         raising=True,
     )
 

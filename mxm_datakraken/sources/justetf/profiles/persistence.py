@@ -1,30 +1,68 @@
 """
-Persistence helpers for ETF profile data.
+Persistence helpers for ETF profile data (bucketed, volatile-source friendly).
+
+Layout (per as_of_bucket):
+    <base_path>/profiles/
+        ├─ <as_of_bucket>/                     # e.g., "2025-10-30"
+        │   ├─ <ISIN>/
+        │   │   ├─ profile.parsed.json
+        │   │   └─ profile.response.json       # provenance sidecar (optional)
+        │   └─ profiles.parsed.json
+        # optional aggregate snapshot for the bucket
+        └─ latest → <as_of_bucket>/            # symlink (or fallback file pointer)
+
+Bucket resolution order for writes:
+1) provenance.as_of_bucket (if provided),
+2) explicit as_of_bucket argument (if provided),
+3) date.today().isoformat() fallback.
+
+Reads default to the "latest" pointer if no bucket is given.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import date
 from pathlib import Path
-from typing import Any, Mapping, Sequence, Union
+from typing import cast
 
 from mxm_dataio.models import Response as IoResponse
 
+from mxm_datakraken.common.file_io import read_json, write_json
+from mxm_datakraken.common.latest_bucket import (
+    resolve_latest_bucket,
+    update_latest_pointer,
+)
+from mxm_datakraken.common.types import JSONLike
 from mxm_datakraken.sources.justetf.common.models import JustETFProfile
 
-JSONLike = Union[Mapping[str, Any], Sequence[Any]]
+# ---------------------------
+# Internal path helper
+# ---------------------------
 
 
-def _write_json(path: Path, data: JSONLike) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    return path
+def _bucket_dir(base_path: Path, *, bucket: str) -> Path:
+    return base_path / "profiles" / bucket
 
 
-def _save_profile_provenance(base_path: Path, *, isin: str, resp: IoResponse) -> Path:
-    meta = {
+def _profile_dir(base_path: Path, *, bucket: str, isin: str) -> Path:
+    return _bucket_dir(base_path, bucket=bucket) / isin
+
+
+# ---------------------------
+# Provenance writer (bucketed)
+# ---------------------------
+
+
+def _write_profile_provenance(
+    base_path: Path,
+    *,
+    isin: str,
+    bucket: str,
+    resp: IoResponse,
+) -> Path:
+    meta: JSONLike = {
         "isin": isin,
+        "as_of_bucket": bucket,
         "dataio_response_id": resp.id,
         "dataio_request_id": resp.request_id,
         "checksum": resp.checksum,
@@ -33,8 +71,14 @@ def _save_profile_provenance(base_path: Path, *, isin: str, resp: IoResponse) ->
         "sequence": resp.sequence,
         "size_bytes": resp.size_bytes,
     }
-    out = base_path / "profiles" / "provenance" / f"{isin}.json"
-    return _write_json(out, meta)
+    out = _profile_dir(base_path, bucket=bucket, isin=isin) / "profile.response.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    return write_json(out, meta)
+
+
+# ---------------------------
+# Public API
+# ---------------------------
 
 
 def save_profile(
@@ -42,58 +86,100 @@ def save_profile(
     base_path: Path,
     *,
     provenance: IoResponse | None = None,
-) -> Path:
-    """Persist a single parsed profile JSON and (optionally) its provenance sidecar."""
-    profiles_dir = base_path / "profiles"
-    profiles_dir.mkdir(parents=True, exist_ok=True)
-    isin = profile.get("isin")
-    if not isinstance(isin, str) or not isin:  # pyright: ignore[reportUnnecessaryIsInstance]
-        raise ValueError("Profile must include non-empty 'isin' (str)")
-    out = profiles_dir / f"{isin}.json"
-    _write_json(out, profile)
-
-    if provenance is not None:
-        _save_profile_provenance(base_path, isin=isin, resp=provenance)
-
-    return out
-
-
-def save_profiles_snapshot(
-    profiles: Sequence[Mapping[str, Any]],
-    base_path: Path,
-    as_of: date | None = None,
+    as_of_bucket: str | None = None,
     write_latest: bool = True,
 ) -> Path:
     """
-    Save a full snapshot of ETF profiles.
+    Persist a single parsed profile JSON and (optionally) its provenance sidecar,
+    under the bucketed layout.
 
-    Creates:
-        - A dated file: profiles_YYYY-MM-DD.json
-        - Optionally, profiles/latest.json
-
-    Args:
-        profiles: List of ETF profiles.
-        base_path: Root directory for profile storage.
-        as_of: Date of snapshot (defaults to today).
-        write_latest: Whether to also update latest.json.
+    Writes:
+        <base>/profiles/<bucket>/<ISIN>/profile.parsed.json
+        <base>/profiles/<bucket>/<ISIN>/profile.response.json (if provenance)
 
     Returns:
-        Path to the dated snapshot file.
+        Path to 'profile.parsed.json'.
     """
-    snapshot_date: date = as_of or date.today()
+    # Determine bucket
+    bucket = (
+        getattr(provenance, "as_of_bucket", None)
+        or as_of_bucket
+        or date.today().isoformat()
+    )
 
-    profile_dir: Path = base_path / "profiles"
-    profile_dir.mkdir(parents=True, exist_ok=True)
+    isin = profile.get("isin")
+    if not isinstance(isin, str) or not isin:  # pyright: ignore[reportUnnecessaryIsInstance]
+        raise ValueError("Profile must include non-empty 'isin' (str)")
 
-    filename: str = f"profiles_{snapshot_date.isoformat()}.json"
-    filepath: Path = profile_dir / filename
+    out_dir = _profile_dir(base_path, bucket=bucket, isin=isin)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    with filepath.open("w", encoding="utf-8") as f:
-        json.dump(profiles, f, ensure_ascii=False, indent=2)
+    parsed_path = out_dir / "profile.parsed.json"
+    write_json(parsed_path, cast(JSONLike, profile))
+
+    if provenance is not None:
+        _write_profile_provenance(base_path, isin=isin, bucket=bucket, resp=provenance)
 
     if write_latest:
-        latest_path: Path = profile_dir / "latest.json"
-        with latest_path.open("w", encoding="utf-8") as f:
-            json.dump(profiles, f, ensure_ascii=False, indent=2)
+        update_latest_pointer(base_path / "profiles", bucket)
 
-    return filepath
+    return parsed_path
+
+
+def load_profile(
+    base_path: Path,
+    *,
+    isin: str,
+    bucket: str | None = None,
+) -> JustETFProfile:
+    """
+    Load a single parsed profile from a bucket (or 'latest' if none specified).
+    """
+    profiles_root = base_path / "profiles"
+    use_bucket = bucket or resolve_latest_bucket(profiles_root)
+    if use_bucket is None:
+        raise FileNotFoundError(
+            "No buckets found under <base>/profiles and no 'latest' pointer."
+        )
+
+    path = _profile_dir(base_path, bucket=use_bucket, isin=isin) / "profile.parsed.json"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Profile for ISIN '{isin}' not found in bucket '{use_bucket}'."
+        )
+    return cast(JustETFProfile, read_json(path))
+
+
+def save_profiles_snapshot(
+    profiles: list[JustETFProfile],
+    base_path: Path,
+    *,
+    provenance: IoResponse | None = None,
+    as_of_bucket: str | None = None,
+    write_latest: bool = True,
+) -> Path:
+    """
+    Save an aggregate snapshot of ETF profiles into the bucket root.
+
+    Writes:
+        <base>/profiles/<bucket>/profiles.parsed.json
+
+    Notes:
+        - This does **not** write per-ISIN files. Use `save_profile(...)` for that.
+        - Kept as a convenience for full-bucket aggregate views and quick inspection.
+    """
+    bucket = (
+        getattr(provenance, "as_of_bucket", None)
+        or as_of_bucket
+        or date.today().isoformat()
+    )
+    bucket_root = _bucket_dir(base_path, bucket=bucket)
+    bucket_root.mkdir(parents=True, exist_ok=True)
+
+    agg_path = bucket_root / "profiles.parsed.json"
+    write_json(agg_path, cast(JSONLike, list(profiles)))
+
+    if write_latest:
+        update_latest_pointer(base_path / "profiles", bucket)
+
+    return agg_path

@@ -45,7 +45,8 @@ Usage
 
 Testing
 -------
-In unit tests, monkeypatch the registry to assert the call without touching global state:
+In unit tests, monkeypatch the registry to assert the call
+without touching global state:
 
     def test_bootstrap_registers(monkeypatch):
         calls = {}

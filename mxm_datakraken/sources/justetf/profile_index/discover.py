@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 from mxm_config import MXMConfig
-from mxm_dataio.api import DataIoSession
 from mxm_dataio.models import Response as IoResponse
+from mxm_dataio.types import RequestParams
 
-from mxm_datakraken.config.config import dataio_for_justetf
+from mxm_datakraken.sources.justetf.common.io import open_justetf_session
 from mxm_datakraken.sources.justetf.common.models import ETFProfileIndexEntry
 
 SITEMAP_URL: str = "https://www.justetf.com/sitemap5.xml"
@@ -65,16 +66,18 @@ def build_profile_index(
     Exception
         Any exception propagated from DataIoSession or the registered adapter.
     """
-    alias, dio_cfg = dataio_for_justetf(cfg)
-    with DataIoSession(source=alias, cfg=dio_cfg, use_cache=True) as io:
+    with open_justetf_session(cfg) as io:
         resp = io.fetch(
             io.request(
                 kind="sitemap",
-                params={
-                    "url": sitemap_url,
-                    "method": "GET",
-                    "headers": {"Accept": "application/xml"},
-                },
+                params=cast(
+                    RequestParams,
+                    {
+                        "url": sitemap_url,
+                        "method": "GET",
+                        "headers": {"Accept": "application/xml"},
+                    },
+                ),
             )
         )
 

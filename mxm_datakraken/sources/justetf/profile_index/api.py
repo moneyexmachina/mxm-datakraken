@@ -1,8 +1,12 @@
 """
 mxm_datakraken.sources.justetf.profile_index.api
 
-Public entry point for the ETF Profile Index.
-Provides a stable interface for the rest of MXM to access discovered ETF profile pages.
+Public entry point for the ETF Profile Index (bucketed layout).
+
+Behavior:
+- Reads from <base>/profile_index/<bucket>/profile_index.parsed.json
+  (defaults to 'latest' when no bucket provided).
+- On refresh, writes to a chosen bucket and updates 'latest'.
 """
 
 from __future__ import annotations
@@ -26,20 +30,41 @@ from mxm_datakraken.sources.justetf.profile_index.persistence import (
 def get_profile_index(
     cfg: MXMConfig,
     base_path: Path,
-    as_of: date | None = None,
+    *,
+    as_of_bucket: str | None = None,
     force_refresh: bool = False,
     sitemap_url: str = SITEMAP_URL,
 ) -> list[ETFProfileIndexEntry]:
-    if force_refresh:
-        entries, resp = build_profile_index(cfg, sitemap_url=sitemap_url)
-        today = as_of or date.today()
-        save_profile_index(entries, base_path, as_of=today, provenance=resp)
-        return entries
+    """
+    Return the ETF profile index using bucketed storage.
 
-    try:
-        return load_profile_index(base_path, as_of=as_of)
-    except (FileNotFoundError, ValueError):
-        entries, resp = build_profile_index(cfg, sitemap_url=sitemap_url)
-        today = as_of or date.today()
-        save_profile_index(entries, base_path, as_of=today, provenance=resp)
-        return entries
+    Bucket resolution:
+      - For reads: use `as_of_bucket` if provided; otherwise default to 'latest'.
+      - For refresh: prefer provenance.as_of_bucket; else `as_of_bucket`;
+      else today's date.
+    """
+    if not force_refresh:
+        try:
+            return load_profile_index(base_path, as_of_bucket=as_of_bucket)
+        except (FileNotFoundError, ValueError):
+            # Fall through to build-and-save path
+            pass
+
+    # Build fresh via HTTP + DataIO
+    entries, resp = build_profile_index(cfg, sitemap_url=sitemap_url)
+
+    # Decide target bucket for write
+    bucket = (
+        getattr(resp, "as_of_bucket", None) or as_of_bucket or date.today().isoformat()
+    )
+
+    # Persist and update 'latest'
+    save_profile_index(
+        entries,
+        base_path,
+        provenance=resp,
+        as_of_bucket=bucket,
+        write_latest=True,
+    )
+
+    return entries

@@ -1,4 +1,3 @@
-# mxm_datakraken/sources/fca_firds/files.py
 from __future__ import annotations
 
 import dataclasses as dc
@@ -7,7 +6,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Callable, Iterable, TypedDict
 
 import requests
 
@@ -21,13 +20,24 @@ MANIFEST_FILE: str = "manifest.json"
 # ------------------------------
 # Data model for manifest
 # ------------------------------
+class ManifestFileInfo(TypedDict):
+    file_type: str
+    publication_date: str
+    download_link: str
+    path: str
+    sha256: str
+    downloaded_at: str
+
+
+class Manifest(TypedDict):
+    files: dict[str, ManifestFileInfo]
 
 
 @dc.dataclass
 class CacheInfo:
     root: Path
     manifest_path: Path
-    manifest: dict
+    manifest: Manifest
 
 
 def _load_cache(cache_dir: Path = DEFAULT_CACHE_DIR) -> CacheInfo:
@@ -36,7 +46,7 @@ def _load_cache(cache_dir: Path = DEFAULT_CACHE_DIR) -> CacheInfo:
     manifest_path = cache_dir / MANIFEST_FILE
     if manifest_path.exists():
         with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
+            manifest: Manifest = json.load(f)
     else:
         manifest = {"files": {}}  # {file_name: metadata}
     return CacheInfo(root=cache_dir, manifest_path=manifest_path, manifest=manifest)
@@ -47,12 +57,6 @@ def _save_cache(info: CacheInfo) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(info.manifest, f, indent=2, sort_keys=True)
     os.replace(tmp, info.manifest_path)
-
-
-def _sha256_bytes(b: bytes) -> str:
-    h = hashlib.sha256()
-    h.update(b)
-    return h.hexdigest()
 
 
 def _dest_path_for(f: FirdsFile, cache_root: Path) -> Path:
@@ -118,7 +122,7 @@ def download_and_cache(
 def download_subset(
     files: Iterable[FirdsFile],
     cache_dir: Path = DEFAULT_CACHE_DIR,
-    predicate: Optional[callable] = None,
+    predicate: Callable[..., FirdsFile] | None = None,
 ) -> list[Path]:
     """
     Download a subset of FIRDS files into cache.

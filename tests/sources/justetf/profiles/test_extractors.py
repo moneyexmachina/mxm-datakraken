@@ -13,7 +13,6 @@ from bs4 import BeautifulSoup
 from mxm_datakraken.sources.justetf.profiles.parser import (
     extract_data_table,
     extract_description,
-    extract_listings,
     extract_name,
 )
 from tests.sources.justetf.profiles.update_goldens import extract_listings

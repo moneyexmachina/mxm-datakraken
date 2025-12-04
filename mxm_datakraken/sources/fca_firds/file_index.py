@@ -105,7 +105,7 @@ def discover_files(
     file_type: str,
     start_date: str,
     end_date: str,
-    file_name_wildcard: Optional[str] = None,
+    file_name_wildcard: str | None = None,
     size: int = 1000,
     sort: str = "publication_date:desc",
     from_idx: int = 0,

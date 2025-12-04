@@ -29,3 +29,10 @@ sources:
             Accept: "*/*"
       # Placeholder for future knobs (http/serialization/audit/cache/etc.)
       _reserved: {}
+
+    # --- Ingestion policy (runtime/session) ---
+    policy:
+      cache_mode: default        # default | only_if_cached | bypass | never | revalidate
+      ttl_seconds: 0             # 0 => always refetch within the current bucket
+      as_of_bucket: "%Y-%m-%d"   # daily buckets (strftime); can also be a literal like "2025Q4"
+      # cache_tag: ""            # optional, set per call if you want

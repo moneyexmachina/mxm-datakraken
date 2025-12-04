@@ -128,7 +128,8 @@ def test_justetf_http_adapter_view_defaults_and_readonly(
     # Headers (if configured) should be a mapping with string values
     headers = getattr(aview, "default_headers", None)  # type: ignore[attr-defined]
     if headers is not None:
-        # OmegaConf allows both dot and item access; use item access for keys like "Accept"
+        """OmegaConf allows both dot and item access; use item access for keys
+        like 'Accept'"""
         assert "Accept" in headers
         assert isinstance(headers["Accept"], str)
 

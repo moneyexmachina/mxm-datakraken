@@ -1,12 +1,11 @@
 """
-Tests for loading ETF Profile Index snapshots from disk.
+Tests for loading ETF Profile Index snapshots from disk (bucketed layout).
 """
 
 from __future__ import annotations
 
-import json
-from datetime import date
 from pathlib import Path
+from typing import List
 
 import pytest
 
@@ -32,42 +31,65 @@ def index() -> list[ETFProfileIndexEntry]:
     ]
 
 
-def test_load_latest(tmp_path: Path, index: list[ETFProfileIndexEntry]) -> None:
-    """Should load latest.json when no as_of is provided."""
-    save_profile_index(index, tmp_path, as_of=date(2025, 10, 1))
-    loaded: list[ETFProfileIndexEntry] = load_profile_index(tmp_path)
+def test_load_latest(tmp_path: Path, index: List[ETFProfileIndexEntry]) -> None:
+    """
+    When no bucket is provided, loader should use the 'latest' pointer.
+    """
+    # First bucket
+    save_profile_index(index, tmp_path, as_of_bucket="2025-10-01")
+    # Second bucket (also becomes latest)
+    save_profile_index(index, tmp_path, as_of_bucket="2025-10-05")
+
+    loaded: List[ETFProfileIndexEntry] = load_profile_index(tmp_path)
     assert loaded == index
 
 
-def test_load_exact_date(tmp_path: Path, index: list[ETFProfileIndexEntry]) -> None:
-    """Should load snapshot for exact matching date."""
-    save_profile_index(index, tmp_path, as_of=date(2025, 10, 1))
-    loaded: list[ETFProfileIndexEntry] = load_profile_index(
-        tmp_path, as_of=date(2025, 10, 1)
+def test_load_exact_bucket(tmp_path: Path, index: List[ETFProfileIndexEntry]) -> None:
+    """
+    With an explicit as_of_bucket, load exactly that bucket without consulting 'latest'.
+    """
+    save_profile_index(index, tmp_path, as_of_bucket="2025-09-30")
+    save_profile_index(index, tmp_path, as_of_bucket="2025-10-02")
+
+    loaded: List[ETFProfileIndexEntry] = load_profile_index(
+        tmp_path, as_of_bucket="2025-09-30"
     )
     assert loaded == index
 
 
-def test_load_closest_before(tmp_path: Path, index: list[ETFProfileIndexEntry]) -> None:
-    """Should pick the closest snapshot <= as_of date."""
-    save_profile_index(index, tmp_path, as_of=date(2025, 9, 30))
-    save_profile_index(index, tmp_path, as_of=date(2025, 10, 2))
-
-    loaded: list[ETFProfileIndexEntry] = load_profile_index(
-        tmp_path, as_of=date(2025, 10, 1)
-    )
-    # Should pick 2025-09-30 snapshot
-    snapshot_path: Path = tmp_path / "profile_index" / "profile_index_2025-09-30.json"
-    expected: list[ETFProfileIndexEntry] = json.loads(
-        snapshot_path.read_text(encoding="utf-8")
-    )
-    assert loaded == expected
-
-
-def test_load_before_any_snapshot(
-    tmp_path: Path, index: list[ETFProfileIndexEntry]
+def test_load_lexicographic_fallback_when_no_latest(
+    tmp_path: Path, index: List[ETFProfileIndexEntry]
 ) -> None:
-    """Should raise FileNotFoundError if no snapshot exists <= as_of."""
-    save_profile_index(index, tmp_path, as_of=date(2025, 10, 5))
+    """
+    If no 'latest' pointer exists, loader should fall back to lexicographically
+    last bucket.
+    """
+    # Write two buckets but do NOT update 'latest'
+    save_profile_index(index, tmp_path, as_of_bucket="2025-09-30", write_latest=False)
+    save_profile_index(index, tmp_path, as_of_bucket="2025-10-02", write_latest=False)
+
+    loaded: List[ETFProfileIndexEntry] = load_profile_index(tmp_path)
+    # Lexicographically last is "2025-10-02"
+    assert loaded == index
+
+
+def test_load_no_buckets_raises(tmp_path: Path) -> None:
+    """
+    If profile_index/ does not exist (or has no buckets), raise FileNotFoundError.
+    """
     with pytest.raises(FileNotFoundError):
-        load_profile_index(tmp_path, as_of=date(2025, 9, 1))
+        _ = load_profile_index(tmp_path)
+
+
+def test_missing_parsed_file_raises(
+    tmp_path: Path, index: List[ETFProfileIndexEntry]
+) -> None:
+    """
+    If a bucket exists but its parsed file is missing, raise FileNotFoundError.
+    """
+    # Create a valid bucket, then remove its parsed file
+    out = save_profile_index(index, tmp_path, as_of_bucket="2025-10-10")
+    out.unlink()  # remove profile_index.parsed.json
+
+    with pytest.raises(FileNotFoundError):
+        _ = load_profile_index(tmp_path, as_of_bucket="2025-10-10")

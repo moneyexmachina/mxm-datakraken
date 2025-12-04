@@ -170,7 +170,7 @@ def extract_listings(soup: BeautifulSoup) -> list[dict[str, str]]:
         if len(cells) != len(headers):
             # Sometimes rowspan/colspan causes mismatch — skip partial rows
             continue
-        row: dict[str, str] = dict(zip(headers, cells))
+        row: dict[str, str] = dict(zip(headers, cells, strict=False))
         listings.append(row)
 
     return listings

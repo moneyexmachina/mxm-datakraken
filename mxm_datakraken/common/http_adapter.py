@@ -114,7 +114,8 @@ class HttpRequestsAdapter(Fetcher):
         self.default_headers = MappingProxyType(coerced)
 
     def fetch(self, request: Request) -> AdapterResult:
-        """Perform an HTTP request described by ``Request.params`` and return the result.
+        """Perform an HTTP request described by ``Request.params``
+        and return the result.
 
         Expected ``request.params`` keys
         --------------------------------
@@ -148,7 +149,10 @@ class HttpRequestsAdapter(Fetcher):
         url = params.get("url")
         if not isinstance(url, str) or not url:
             raise ValueError(
-                "HttpRequestsAdapter.fetch: request.params['url'] must be a non-empty string."
+                (
+                    "HttpRequestsAdapter.fetch: request.params['url']"
+                    " must be a non-empty string."
+                )
             )
 
         method = str(params.get("method") or "GET").upper()
@@ -165,7 +169,8 @@ class HttpRequestsAdapter(Fetcher):
             body = body.encode("utf-8")
 
         try:
-            # Optional polish: pass only per-request headers; requests will merge with session defaults.
+            """Optional polish: pass only per-request headers;
+            requests will merge with session defaults."""
             resp: Response = self._session.request(
                 method=method,
                 url=url,

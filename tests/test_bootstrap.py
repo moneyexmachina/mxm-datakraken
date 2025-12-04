@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any, Mapping, Optional, cast
+from typing import Mapping, NoReturn, Optional, cast
 
 import pytest
 from mxm_config import MXMConfig
@@ -14,9 +14,9 @@ from mxm_datakraken.common.http_adapter import HttpRequestsAdapter
 
 class _RegisterSpy:
     def __init__(self) -> None:
-        self.calls: list[tuple[str, Any]] = []
+        self.calls: list[tuple[str, HttpRequestsAdapter]] = []
 
-    def __call__(self, alias: str, adapter: Any) -> None:
+    def __call__(self, alias: str, adapter: HttpRequestsAdapter) -> None:
         self.calls.append((alias, adapter))
 
 
@@ -33,7 +33,7 @@ def _node(
     user_agent: str = "mxm-dk/0.2",
     default_timeout: float = 9.0,
     default_headers: Optional[Mapping[str, str]] = None,
-) -> Any:
+) -> SimpleNamespace:
     """Return a simple attribute bag that behaves like the adapter view node."""
     return SimpleNamespace(
         enabled=enabled,
@@ -50,10 +50,12 @@ def _node(
 def test_register_from_view_registers(monkeypatch: pytest.MonkeyPatch) -> None:
     spy = _RegisterSpy()
 
-    def _patch_register(alias: str, adapter: Any) -> None:
+    def _patch_register(alias: str, adapter: HttpRequestsAdapter) -> None:
         spy(alias, adapter)
 
-    def _patch_view(_cfg: MXMConfig, resolve: bool = True) -> Any:  # noqa: ARG001
+    def _patch_view(_cfg: MXMConfig, resolve: bool = True) -> SimpleNamespace:
+        _ = _cfg
+        _ = resolve
         return _node(
             alias="justetf",
             user_agent="mxm-dk/0.2",
@@ -83,10 +85,12 @@ def test_register_from_view_registers(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_register_disabled_does_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     spy = _RegisterSpy()
 
-    def _patch_register(alias: str, adapter: Any) -> None:
+    def _patch_register(alias: str, adapter: HttpRequestsAdapter) -> None:
         spy(alias, adapter)
 
-    def _patch_view(_cfg: MXMConfig, resolve: bool = True) -> Any:  # noqa: ARG001
+    def _patch_view(_cfg: MXMConfig, resolve: bool = True) -> SimpleNamespace:
+        _ = _cfg
+        _ = resolve
         return _node(enabled=False)
 
     monkeypatch.setattr(
@@ -103,10 +107,14 @@ def test_register_disabled_does_nothing(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_register_swallows_registry_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _boom(_alias: str, _adapter: Any) -> None:
+    def _boom(_alias: str, _adapter: HttpRequestsAdapter) -> None:
+        _ = _alias
+        _ = _adapter
         raise RuntimeError("duplicate")
 
-    def _patch_view(_cfg: MXMConfig, resolve: bool = True) -> Any:  # noqa: ARG001
+    def _patch_view(_cfg: MXMConfig, resolve: bool = True) -> SimpleNamespace:
+        _ = _cfg
+        _ = resolve
         return _node()
 
     monkeypatch.setattr("mxm_datakraken.bootstrap.register", _boom, raising=True)
@@ -123,10 +131,12 @@ def test_missing_adapter_node_is_noop(monkeypatch: pytest.MonkeyPatch) -> None:
     """If the view is missing or fails, bootstrap should no-op gracefully."""
     spy = _RegisterSpy()
 
-    def _patch_register(alias: str, adapter: Any) -> None:
+    def _patch_register(alias: str, adapter: HttpRequestsAdapter) -> None:
         spy(alias, adapter)
 
-    def _raise_view(_cfg: MXMConfig, resolve: bool = True) -> Any:  # noqa: ARG001
+    def _raise_view(_cfg: MXMConfig, resolve: bool = True) -> NoReturn:
+        _ = _cfg
+        _ = resolve
         raise AttributeError("no node")
 
     monkeypatch.setattr(
@@ -151,11 +161,15 @@ def test_register_strict_raises_on_missing_http_node(
     """
 
     # Ensure the view used by bootstrap simulates a missing/ill-formed node
-    def _raise_view(_cfg: MXMConfig, resolve: bool = True) -> object:  # noqa: ARG001
+    def _raise_view(_cfg: MXMConfig, resolve: bool = True) -> NoReturn:
+        _ = _cfg
+        _ = resolve
         raise AttributeError("no node")
 
     # We don't expect register() to be called at all, but patch it to be safe
-    def _should_not_be_called(alias: str, adapter: object) -> None:  # noqa: ARG001
+    def _should_not_be_called(alias: str, adapter: HttpRequestsAdapter) -> None:
+        _ = alias
+        _ = adapter
         pytest.fail("register() was called despite strict mode and missing node")
 
     monkeypatch.setattr(

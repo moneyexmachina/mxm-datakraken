@@ -1,4 +1,4 @@
-# mxm-datakraken 🐙
+# mxm-datakraken
 
 **mxm-datakraken** is the data collection package of the **Money Ex Machina** ecosystem.  
 It provides connectors and scrapers to external data sources (APIs, broker exports, websites),  

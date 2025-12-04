@@ -1,5 +1,5 @@
-# tests/test_file_index.py
 import pytest
+from mxm.types import JSONLike, JSONObj
 
 import mxm_datakraken.sources.fca_firds.file_index as fi
 
@@ -11,19 +11,23 @@ import mxm_datakraken.sources.fca_firds.file_index as fi
 class DummyResp:
     """Minimal mock of requests.Response for our tests."""
 
-    def __init__(self, status_code=200, json_data=None):
+    def __init__(
+        self,
+        status_code: int = 200,
+        json_data: JSONLike | None = None,
+    ) -> None:
         self.status_code = status_code
         self._json = json_data or {}
 
-    def json(self):
+    def json(self) -> JSONLike:
         return self._json
 
-    def raise_for_status(self):
+    def raise_for_status(self) -> None:
         if self.status_code != 200:
             raise RuntimeError(f"HTTP {self.status_code}")
 
 
-def test_discover_files_parses_hits(monkeypatch):
+def test_discover_files_parses_hits(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure discover_files returns FirdsFile list from sample JSON."""
 
     sample_json = {
@@ -41,7 +45,8 @@ def test_discover_files_parses_hits(monkeypatch):
         }
     }
 
-    def fake_request(params, *args, **kwargs):
+    def fake_request(params: JSONObj, *args: object, **kwargs: object) -> JSONLike:
+        _ = params, args, kwargs
         return sample_json
 
     monkeypatch.setattr(fi, "_request_with_backoff", fake_request)
@@ -56,12 +61,13 @@ def test_discover_files_parses_hits(monkeypatch):
     assert f.download_link.startswith("https://")
 
 
-def test_discover_latest_publication_date(monkeypatch):
+def test_discover_latest_publication_date(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure discover_latest_publication_date extracts latest date."""
 
     sample_json = {"hits": {"hits": [{"_source": {"publication_date": "2025-02-15"}}]}}
 
-    def fake_request(params, *args, **kwargs):
+    def fake_request(params: JSONObj, *args: object, **kwargs: object) -> JSONLike:
+        _ = params, args, kwargs
         return sample_json
 
     monkeypatch.setattr(fi, "_request_with_backoff", fake_request)
@@ -70,17 +76,23 @@ def test_discover_latest_publication_date(monkeypatch):
     assert result == "2025-02-15"
 
 
-def test_discover_latest_full_etf_bucket(monkeypatch):
+def test_discover_latest_full_etf_bucket(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure discover_latest_full_etf_bucket calls discover_files with C bucket."""
 
-    calls = {}
+    calls: dict[str, object] = {}
 
-    def fake_latest_date(file_type):
+    def fake_latest_date(file_type: str) -> str:
+        _ = file_type
         return "2025-03-01"
 
     def fake_discover_files(
-        file_type, start_date, end_date, file_name_wildcard=None, **kwargs
-    ):
+        file_type: str,
+        start_date: str,
+        end_date: str,
+        file_name_wildcard: str | None = None,
+        **kwargs: object,
+    ) -> list[fi.FirdsFile]:
+        _ = kwargs
         calls.update(
             dict(
                 file_type=file_type,
@@ -113,7 +125,7 @@ def test_discover_latest_full_etf_bucket(monkeypatch):
 
 
 @pytest.mark.integration
-def test_integration_latest_date_and_files():
+def test_integration_latest_date_and_files() -> None:
     """Hit the live FCA FIRDS API (slow, network)."""
     latest_date = fi.discover_latest_publication_date("FULINS")
     assert latest_date is not None

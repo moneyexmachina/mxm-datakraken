@@ -1,22 +1,36 @@
 [tool.poetry]
 name = "mxm-datakraken"
-version = "0.2.0"
+version = "0.3.0"
 description = "Data-collection and scraping framework for Money ex Machina."
 authors = ["mxm <contact@moneyexmachina.com>"]
 license = "MIT"
 readme = "README.md"
 
+packages = [
+  { include = "mxm_datakraken" }
+]
+
+# ship asset files in both sdist and wheel
+include = [
+  { path = "mxm_datakraken/assets/**/*.txt", format = "sdist" },
+  { path = "mxm_datakraken/assets/**/*.txt", format = "wheel" }
+]
+
+
 [tool.poetry.dependencies]
-python = "^3.13"
+python = ">=3.13, <3.15"
 requests = ">=2.32.5,<3.0.0"
 bs4 = ">=0.0.2,<0.0.3"
 mxm-config = ">=0.3.0"
-mxm-dataio = ">=0.2.2"
+mxm-dataio = ">=0.3.0"
 rich = "^14.1.0"
+mxm-types = "^0.1.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+
 
 # -------------------------
 # Coding standards
@@ -26,8 +40,7 @@ build-backend = "poetry.core.masonry.api"
 line-length = 88
 target-version = "py313"
 # Select rulesets; expand gradually if desired
-select = ["E", "F", "B", "ANN"]
-ignore = ["ANN101", "ANN102"]
+lint.select = ["E", "F", "B", "ANN"]
 # Exclude common non-source dirs
 exclude = ["build", "dist", ".venv"]
 

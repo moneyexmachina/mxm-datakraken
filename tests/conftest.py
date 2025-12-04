@@ -18,7 +18,8 @@ def _mirror_pkg_config(
 ) -> Path:
     """
     Create MXM_CONFIG_HOME/<package_name>/ that mirrors the package's config directory.
-    Prefer a symlink; fall back to copying if symlink fails (e.g., Windows without perms).
+    Prefer a symlink; fall back to copying if symlink fails
+    (e.g., Windows without perms).
     """
     target_dir = tmp_root / package_name
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -53,7 +54,8 @@ def mxm_config_home(
     Usage in tests:
         home_for = mxm_config_home
         home_for("mxm-datakraken", "mxm_datakraken")
-        # Now load_config(package="mxm-datakraken", ...) reads from repo YAMLs (no install).
+        # Now load_config(package="mxm-datakraken", ...) reads from repo YAMLs
+        (no install).
     """
 
     def _make(package_name: str, package_module: str) -> Path:

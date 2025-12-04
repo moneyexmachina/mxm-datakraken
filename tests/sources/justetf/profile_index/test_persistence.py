@@ -1,15 +1,15 @@
 """
-Tests for persistence of ETF Profile Index snapshots.
+Tests for persistence of ETF Profile Index snapshots (bucketed layout).
 """
 
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 
 import pytest
 
+from mxm_datakraken.common.latest_bucket import resolve_latest_bucket
 from mxm_datakraken.sources.justetf.profile_index.discover import ETFProfileIndexEntry
 from mxm_datakraken.sources.justetf.profile_index.persistence import save_profile_index
 
@@ -20,9 +20,9 @@ def tmpdir_path(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_save_profile_index(tmpdir_path: Path) -> None:
-    """Ensure profile index snapshots are saved correctly to JSON."""
-
+def test_save_profile_index_bucketed(tmpdir_path: Path) -> None:
+    """Ensure profile index snapshots are saved correctly under
+    <bucket>/profile_index.parsed.json and 'latest' is updated."""
     index: list[ETFProfileIndexEntry] = [
         {
             "isin": "TEST123",
@@ -35,19 +35,36 @@ def test_save_profile_index(tmpdir_path: Path) -> None:
         },
     ]
 
-    snapshot_date: date = date(2025, 10, 1)
-    outpath: Path = save_profile_index(index, tmpdir_path, as_of=snapshot_date)
+    bucket = "2025-10-01"
+    outpath: Path = save_profile_index(index, tmpdir_path, as_of_bucket=bucket)
 
-    # Check that snapshot file exists
+    # Check returned path and layout
     assert outpath.exists()
+    assert outpath.name == "profile_index.parsed.json"
+    assert outpath.parent.name == bucket
+    assert outpath.parent.parent.name == "profile_index"
+
+    # Content check
     data: list[ETFProfileIndexEntry] = json.loads(outpath.read_text(encoding="utf-8"))
     assert len(data) == 2
     assert data[0]["isin"] == "TEST123"
 
-    # Check that latest.json also exists and matches
-    latest: Path = tmpdir_path / "profile_index" / "latest.json"
-    assert latest.exists()
-    data_latest: list[ETFProfileIndexEntry] = json.loads(
-        latest.read_text(encoding="utf-8")
+    # Latest pointer resolves to this bucket
+    pi_root = tmpdir_path / "profile_index"
+    latest_bucket = resolve_latest_bucket(pi_root)
+    assert latest_bucket == bucket
+
+    # Parsed file exists at the resolved latest bucket
+    latest_parsed = pi_root / latest_bucket / "profile_index.parsed.json"
+    assert latest_parsed.exists()
+
+
+def test_save_profile_index_no_latest(tmpdir_path: Path) -> None:
+    index: list[ETFProfileIndexEntry] = [{"isin": "ABC", "url": "https://x/abc"}]
+    _ = save_profile_index(
+        index, tmpdir_path, as_of_bucket="2025-10-02", write_latest=False
     )
-    assert data_latest == data
+
+    # No latest pointer should be resolvable when none exists
+    pi_root = tmpdir_path / "profile_index"
+    assert resolve_latest_bucket(pi_root) is None

@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, Mapping, MutableMapping, Sequence, cast
+from typing import Mapping, Sequence, cast
 
 from mxm_config import load_config
 from rich.console import Console
@@ -152,9 +152,12 @@ def main() -> None:
     elif args.isin or args.index is not None:
         show_etf_profile(snapshot, isin=args.isin, index=args.index)
     else:
-        console.print(
-            "[yellow]Use --list to view all ISINs, or --isin/--index to inspect one.[/yellow]"
+        msg = (
+            "[yellow]Use --list to view all ISINs, "
+            "or --isin/--index to inspect one.[/yellow]"
         )
+
+        console.print(msg)
 
 
 if __name__ == "__main__":
