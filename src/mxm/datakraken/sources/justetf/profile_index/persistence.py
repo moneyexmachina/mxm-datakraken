@@ -7,11 +7,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List, cast
 
+from mxm.types import JSONLike
 from mxm_dataio.models import Response as IoResponse
 
 from mxm.datakraken.common.file_io import read_json, write_json
 from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm.datakraken.common.types import JSONLike
 from mxm.datakraken.sources.justetf.profile_index.discover import (
     ETFProfileIndexEntry,
 )

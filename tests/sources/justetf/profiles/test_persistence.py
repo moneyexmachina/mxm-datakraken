@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from mxm.types import JSONLike
 
 from mxm.datakraken.common.file_io import read_json
 from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
-from mxm.datakraken.common.types import JSONLike
 from mxm.datakraken.sources.justetf.common.models import JustETFProfile
 from mxm.datakraken.sources.justetf.profiles.persistence import (
     save_profile,

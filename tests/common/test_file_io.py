@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
+from mxm.types import JSONLike
 
 from mxm.datakraken.common.file_io import read_json, write_json
-from mxm.datakraken.common.types import JSONLike
 
 
 def test_write_then_read_roundtrip(tmp_path: Path) -> None:
