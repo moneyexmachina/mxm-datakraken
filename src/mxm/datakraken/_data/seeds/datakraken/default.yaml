@@ -1,0 +1,38 @@
+# Package-scoped scaffold: where this package writes on disk
+paths:
+  data_root: ${paths.data_root_base}/${mxm_env}/datakraken/${mxm_profile}
+
+sources:
+  justetf:
+    # Filesystem locations this package uses directly
+    root:               ${paths.data_root}/sources/justetf
+    profile_index_dir:  ${sources.justetf.root}/profile_index
+    profiles_dir:       ${sources.justetf.root}/profiles
+    parsed_dir:         ${sources.justetf.root}/parsed
+    logs_dir:           ${sources.justetf.root}/logs
+
+    # Minimal DataIO subtree — only what the Store needs today
+    dataio:
+      paths:
+        root:          ${sources.justetf.root}
+        db_path:       ${sources.justetf.root}/dataio.sqlite
+        responses_dir: ${sources.justetf.root}/responses
+      adapters:
+        http:
+          enabled: true
+          # Registry alias to use. If you later add more sources that share
+          # the same HTTP adapter instance, you can still reuse "http".
+          alias: "justetf"
+          user_agent: "mxm-datakraken/0.2 (contact@moneyexmachina.com)"
+          default_timeout: 30.0
+          default_headers:
+            Accept: "*/*"
+      # Placeholder for future knobs (http/serialization/audit/cache/etc.)
+      _reserved: {}
+
+    # --- Ingestion policy (runtime/session) ---
+    policy:
+      cache_mode: default        # default | only_if_cached | bypass | never | revalidate
+      ttl_seconds: 0             # 0 => always refetch within the current bucket
+      as_of_bucket: "%Y-%m-%d"   # daily buckets (strftime); can also be a literal like "2025Q4"
+      # cache_tag: ""            # optional, set per call if you want
