@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from mxm_dataio.api import CacheMode
+from mxm.dataio.api import CacheMode
 
 
 @dataclass(frozen=True)

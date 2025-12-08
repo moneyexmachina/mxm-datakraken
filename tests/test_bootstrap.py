@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import Mapping, NoReturn, Optional, cast
 
 import pytest
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.bootstrap import register_adapters_from_config
 from mxm.datakraken.common.http_adapter import HttpRequestsAdapter

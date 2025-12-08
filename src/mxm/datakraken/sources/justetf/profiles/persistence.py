@@ -25,8 +25,8 @@ from datetime import date
 from pathlib import Path
 from typing import cast
 
+from mxm.dataio.models import Response as IoResponse
 from mxm.types import JSONLike
-from mxm_dataio.models import Response as IoResponse
 
 from mxm.datakraken.common.file_io import read_json, write_json
 from mxm.datakraken.common.latest_bucket import (

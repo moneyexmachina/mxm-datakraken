@@ -12,7 +12,7 @@ from typing import Iterator, Optional, Type, cast
 
 import pytest
 from mxm.types import JSONObj
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.sources.justetf.profile_index.discover import (
     build_profile_index,

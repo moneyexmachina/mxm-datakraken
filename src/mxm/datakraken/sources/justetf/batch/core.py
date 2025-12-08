@@ -16,7 +16,7 @@ from datetime import date
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
 from mxm.datakraken.sources.justetf.common.models import (

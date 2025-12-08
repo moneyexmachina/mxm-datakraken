@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.sources.justetf.profile_index.discover import (
     SITEMAP_URL,

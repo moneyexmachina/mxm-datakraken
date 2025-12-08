@@ -6,8 +6,8 @@ from types import MethodType
 from typing import Dict, Mapping, MutableMapping, NoReturn, Optional, cast
 
 import pytest
-from mxm_dataio.models import Request
-from mxm_dataio.types import RequestParams
+from mxm.dataio.models import Request
+from mxm.types import JSONObj
 from requests import HTTPError, Response, Session
 
 from mxm.datakraken.common.http_adapter import HttpRequestsAdapter
@@ -15,7 +15,7 @@ from mxm.datakraken.common.http_adapter import HttpRequestsAdapter
 # ----- helpers ---------------------------------------------------------------
 
 
-def _req(kind: str, params: RequestParams) -> Request:
+def _req(kind: str, params: JSONObj) -> Request:
     """Construct a Request with a fixed session_id for tests."""
     return Request(kind=kind, params=params, session_id="test-session")
 
@@ -140,7 +140,7 @@ def test_post_with_string_body_encodes_utf8() -> None:
         "timeout": 5,
         "allow_redirects": False,
     }  # NOTE: headers use a nested mapping, which RequestParams doesn't model yet.
-    req = _req("post", cast(RequestParams, params))
+    req = _req("post", cast(JSONObj, params))
     res = adapter.fetch(req)
 
     assert res.transport_status == 200
@@ -185,7 +185,7 @@ def test_headers_merge() -> None:
     # this cast can go.
     req = _req(
         "get",
-        cast(RequestParams, params),
+        cast(JSONObj, params),
     )
     _ = adapter.fetch(req)
 

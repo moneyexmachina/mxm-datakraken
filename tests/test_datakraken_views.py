@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable, cast
 
 import pytest
-from mxm_config import load_config
+from mxm.config import load_config
 from omegaconf import DictConfig
 from omegaconf.errors import ReadonlyConfigError
 

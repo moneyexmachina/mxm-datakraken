@@ -6,7 +6,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, cast
 
 import pytest
 from mxm.types import JSONLike, JSONObj
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 # Target the orchestrator module for monkeypatches
 import mxm.datakraken.sources.justetf.batch.run as run_mod
