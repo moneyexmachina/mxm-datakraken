@@ -37,7 +37,7 @@ Behavior & guarantees
 
 Usage
 -----
-    from mxm_config import load_config
+    from mxm.config import load_config
     from mxm.datakraken.bootstrap import register_adapters_from_config
 
     cfg = load_config(package="mxm-datakraken", env="dev", profile="default")
@@ -62,8 +62,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional, cast
 
-from mxm_config import MXMConfig
-from mxm_dataio.registry import register
+from mxm.config import MXMConfig
+from mxm.dataio.registry import register
 
 from mxm.datakraken.common.http_adapter import HttpRequestsAdapter
 from mxm.datakraken.config.config import justetf_http_adapter_view

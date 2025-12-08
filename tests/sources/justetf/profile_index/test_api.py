@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from typing import NoReturn, cast
 
 import pytest
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.common.latest_bucket import resolve_latest_bucket
 from mxm.datakraken.sources.justetf.common.models import ETFProfileIndexEntry

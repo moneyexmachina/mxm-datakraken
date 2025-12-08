@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 from typing import Optional, Sequence, cast
 
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.sources.justetf.batch.core import (
     BatchStats,

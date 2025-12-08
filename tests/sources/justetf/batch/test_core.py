@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Protocol, Tuple, cast
 
 import pytest
-from mxm_config import MXMConfig
+from mxm.config import MXMConfig
 
 from mxm.datakraken.sources.justetf.batch.core import (
     process_one_entry,

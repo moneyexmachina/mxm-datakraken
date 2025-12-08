@@ -17,9 +17,9 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import parse_qs, urlparse
 
-from mxm_config import MXMConfig
-from mxm_dataio.models import Response as IoResponse
-from mxm_dataio.types import RequestParams
+from mxm.config import MXMConfig
+from mxm.dataio.models import Response as IoResponse
+from mxm.types import JSONObj
 
 from mxm.datakraken.sources.justetf.common.io import open_justetf_session
 from mxm.datakraken.sources.justetf.common.models import ETFProfileIndexEntry
@@ -71,7 +71,7 @@ def build_profile_index(
             io.request(
                 kind="sitemap",
                 params=cast(
-                    RequestParams,
+                    JSONObj,
                     {
                         "url": sitemap_url,
                         "method": "GET",

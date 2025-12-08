@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from mxm_config import MXMConfig, make_subconfig
+from mxm.config import MXMConfig, make_subconfig
 
 from mxm.datakraken.config.config import (
     ensure_justetf_config,

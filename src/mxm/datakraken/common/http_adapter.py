@@ -28,8 +28,8 @@ from types import MappingProxyType
 from typing import Any, Mapping, Optional
 
 import requests
-from mxm_dataio.adapters import Fetcher
-from mxm_dataio.models import AdapterResult, Request
+from mxm.dataio.adapters import Fetcher
+from mxm.dataio.models import AdapterResult, Request
 from requests import HTTPError, Response, Session
 
 

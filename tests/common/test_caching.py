@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from mxm_dataio.api import CacheMode
+from mxm.dataio.api import CacheMode
 
 from mxm.datakraken.common.caching import (
     resolve_as_of_bucket,

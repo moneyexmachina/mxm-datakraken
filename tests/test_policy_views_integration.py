@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Callable, cast
 
 import pytest
-from mxm_config import load_config
-from mxm_dataio.api import CacheMode
+from mxm.config import load_config
+from mxm.dataio.api import CacheMode
 from omegaconf import DictConfig
 from omegaconf.errors import ReadonlyConfigError
 

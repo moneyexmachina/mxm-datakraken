@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from mxm_config import MXMConfig, make_view
+from mxm.config import MXMConfig, make_view
 
 from mxm.datakraken.common.caching import (
     CachePolicy,

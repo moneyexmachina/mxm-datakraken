@@ -9,9 +9,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from mxm_config import MXMConfig
-from mxm_dataio.models import Response as IoResponse
-from mxm_dataio.types import RequestParams
+from mxm.config import MXMConfig
+from mxm.dataio.models import Response as IoResponse
+from mxm.types import JSONObj
 
 from mxm.datakraken.sources.justetf.common.io import open_justetf_session
 
@@ -37,7 +37,7 @@ def download_etf_profile_html(
     """
     _ = isin  # reserved for logging/debug
     params = cast(
-        RequestParams,
+        JSONObj,
         {
             "url": url,
             "method": "GET",
